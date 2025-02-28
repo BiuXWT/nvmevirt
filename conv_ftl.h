@@ -8,6 +8,7 @@
 #include "ssd_config.h"
 #include "ssd.h"
 
+//垃圾回收参数
 struct convparams {
 	uint32_t gc_thres_lines;
 	uint32_t gc_thres_lines_high;

@@ -11,10 +11,10 @@
 #define WD_ZN540 4
 
 /* SSD Type */
-#define SSD_TYPE_NVM 0
-#define SSD_TYPE_CONV 1
-#define SSD_TYPE_ZNS 2
-#define SSD_TYPE_KV 3
+#define SSD_TYPE_NVM 0	//NVM SSD ， INTEL 傲腾 ， 3D-xpoint架构？？
+#define SSD_TYPE_CONV 1 //传统SSD ,使用传统FTL架构
+#define SSD_TYPE_ZNS 2  //ZNS SSD
+#define SSD_TYPE_KV 3   //KV SSD
 
 /* Cell Mode */
 #define CELL_MODE_UNKNOWN 0

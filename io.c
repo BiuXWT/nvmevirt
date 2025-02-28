@@ -24,6 +24,7 @@ extern bool io_using_dma;
 
 static inline unsigned int __get_io_worker(int sqid)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 #ifdef CONFIG_NVMEV_IO_WORKER_BY_SQ
 	return (sqid - 1) % nvmev_vdev->config.nr_io_workers;
 #else
@@ -33,21 +34,25 @@ static inline unsigned int __get_io_worker(int sqid)
 
 static inline unsigned long long __get_wallclock(void)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	return cpu_clock(nvmev_vdev->config.cpu_nr_dispatcher);
 }
 
 static inline size_t __cmd_io_offset(struct nvme_rw_command *cmd)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	return (cmd->slba) << LBA_BITS;
 }
 
 static inline size_t __cmd_io_size(struct nvme_rw_command *cmd)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	return (cmd->length + 1) << LBA_BITS;
 }
 
 static unsigned int __do_perform_io(int sqid, int sq_entry)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_submission_queue *sq = nvmev_vdev->sqes[sqid];
 	struct nvme_rw_command *cmd = &sq_entry(sq_entry).rw;
 	size_t offset;
@@ -90,7 +95,7 @@ static unsigned int __do_perform_io(int sqid, int sq_entry)
 			if (io_size + mem_offs > PAGE_SIZE)
 				io_size = PAGE_SIZE - mem_offs;
 		}
-
+		//向虚拟的存储设备写入数据
 		if (cmd->opcode == nvme_cmd_write ||
 		    cmd->opcode == nvme_cmd_zone_append) {
 			memcpy(nvmev_vdev->ns[nsid].mapped + offset, vaddr + mem_offs, io_size);
@@ -115,6 +120,7 @@ static u64 paddr_list[513] = {
 }; // Not using index 0 to make max index == num_prp
 static unsigned int __do_perform_io_using_dma(int sqid, int sq_entry)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_submission_queue *sq = nvmev_vdev->sqes[sqid];
 	struct nvme_rw_command *cmd = &sq_entry(sq_entry).rw;
 	size_t offset;
@@ -212,6 +218,7 @@ static unsigned int __do_perform_io_using_dma(int sqid, int sq_entry)
 static void __insert_req_sorted(unsigned int entry, struct nvmev_io_worker *worker,
 				unsigned long nsecs_target)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	/**
 	 * Requests are placed in @work_queue sorted by their target time.
 	 * @work_queue is statically allocated and the ordered list is
@@ -257,6 +264,7 @@ static void __insert_req_sorted(unsigned int entry, struct nvmev_io_worker *work
 
 static struct nvmev_io_worker *__allocate_work_queue_entry(int sqid, unsigned int *entry)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	unsigned int io_worker_turn = __get_io_worker(sqid);
 	struct nvmev_io_worker *worker = &nvmev_vdev->io_workers[io_worker_turn];
 	unsigned int e = worker->free_seq;
@@ -281,6 +289,7 @@ static struct nvmev_io_worker *__allocate_work_queue_entry(int sqid, unsigned in
 static void __enqueue_io_req(int sqid, int cqid, int sq_entry, unsigned long long nsecs_start,
 			     struct nvmev_result *ret)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_submission_queue *sq = nvmev_vdev->sqes[sqid];
 	struct nvmev_io_worker *worker;
 	struct nvmev_io_work *w;
@@ -319,6 +328,7 @@ static void __enqueue_io_req(int sqid, int cqid, int sq_entry, unsigned long lon
 void schedule_internal_operation(int sqid, unsigned long long nsecs_target,
 				 struct buffer *write_buffer, size_t buffs_to_release)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_io_worker *worker;
 	struct nvmev_io_work *w;
 	unsigned int entry;
@@ -351,6 +361,7 @@ void schedule_internal_operation(int sqid, unsigned long long nsecs_target,
 
 static void __reclaim_completed_reqs(void)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	unsigned int turn;
 
 	for (turn = 0; turn < nvmev_vdev->config.nr_io_workers; turn++) {
@@ -402,6 +413,7 @@ static void __reclaim_completed_reqs(void)
 
 static size_t __nvmev_proc_io(int sqid, int sq_entry, size_t *io_size)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_submission_queue *sq = nvmev_vdev->sqes[sqid];
 	unsigned long long nsecs_start = __get_wallclock();
 	struct nvme_command *cmd = &sq_entry(sq_entry);
@@ -471,6 +483,7 @@ static size_t __nvmev_proc_io(int sqid, int sq_entry, size_t *io_size)
 
 int nvmev_proc_io_sq(int sqid, int new_db, int old_db)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_submission_queue *sq = nvmev_vdev->sqes[sqid];
 	int num_proc = new_db - old_db;
 	int seq;
@@ -503,6 +516,7 @@ int nvmev_proc_io_sq(int sqid, int new_db, int old_db)
 
 void nvmev_proc_io_cq(int cqid, int new_db, int old_db)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_completion_queue *cq = nvmev_vdev->cqes[cqid];
 	int i;
 	for (i = old_db; i != new_db; i++) {
@@ -526,6 +540,7 @@ void nvmev_proc_io_cq(int cqid, int new_db, int old_db)
 
 static void __fill_cq_result(struct nvmev_io_work *w)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	int sqid = w->sqid;
 	int cqid = w->cqid;
 	int sq_entry = w->sq_entry;
@@ -558,6 +573,7 @@ static void __fill_cq_result(struct nvmev_io_work *w)
 
 static int nvmev_io_worker(void *data)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_io_worker *worker = (struct nvmev_io_worker *)data;
 	struct nvmev_ns *ns;
 	static unsigned long last_io_time = 0;
@@ -631,6 +647,7 @@ static int nvmev_io_worker(void *data)
 						       w->buffs_to_release);
 #endif
 				} else {
+					// SSD 写 CQ
 					__fill_cq_result(w);
 				}
 
@@ -669,6 +686,7 @@ static int nvmev_io_worker(void *data)
 					prev_clock = local_clock();
 #endif
 					cq->interrupt_ready = false;
+					//SSD发中断通知主机：命令完成
 					nvmev_signal_irq(cq->irq_vector);
 
 #ifdef PERF_DEBUG
@@ -698,12 +716,14 @@ static int nvmev_io_worker(void *data)
 
 void NVMEV_IO_WORKER_INIT(struct nvmev_dev *nvmev_vdev)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	unsigned int i, worker_id;
 
 	nvmev_vdev->io_workers =
 		kcalloc(sizeof(struct nvmev_io_worker), nvmev_vdev->config.nr_io_workers, GFP_KERNEL);
 	nvmev_vdev->io_worker_turn = 0;
 
+	//创建nvmev_vdev->config.nr_io_workers个数量的io worker
 	for (worker_id = 0; worker_id < nvmev_vdev->config.nr_io_workers; worker_id++) {
 		struct nvmev_io_worker *worker = &nvmev_vdev->io_workers[worker_id];
 
@@ -731,6 +751,7 @@ void NVMEV_IO_WORKER_INIT(struct nvmev_dev *nvmev_vdev)
 
 void NVMEV_IO_WORKER_FINAL(struct nvmev_dev *nvmev_vdev)
 {
+//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	unsigned int i;
 
 	for (i = 0; i < nvmev_vdev->config.nr_io_workers; i++) {

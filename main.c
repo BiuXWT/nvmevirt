@@ -53,6 +53,36 @@
  * 1. Memmap start
  * 2. Memmap size
  ****************************************************************/
+/****************************************************************
+ * 内存布局
+ ****************************************************************
+ * virtDev
+ *  - PCI头部
+ *    -> 在1MiB区域的BAR
+ *  - PCI能力描述符
+ *
+ * +--- memmap_start
+ * |
+ * v
+ * +--------------+------------------------------------------+
+ * | <---1MiB---> | <---------- 存储区域 --------------> |
+ * +--------------+------------------------------------------+
+ *
+ * 1MiB区域用于元数据
+ *  - BAR：1页
+ *	- DBS：1页
+ *	- MSI-x表：16字节/每条 * 32
+ *
+ * 存储区域
+ *
+ ****************************************************************/
+
+/****************************************************************
+ * 参数
+ ****************************************************************
+ * 1. 内存映射起始地址
+ * 2. 内存映射大小
+ ****************************************************************/
 
 struct nvmev_dev *nvmev_vdev = NULL;
 
@@ -77,6 +107,8 @@ int io_using_dma = false;
 
 static int set_parse_mem_param(const char *val, const struct kernel_param *kp)
 {
+	NVMEV_INFO("file: [%s]-[%s] start ", __FILE__, __FUNCTION__);
+	NVMEV_INFO("val = %s\n",val);
 	unsigned long *arg = (unsigned long *)kp->arg;
 	*arg = memparse(val, NULL);
 	return 0;
@@ -114,6 +146,7 @@ module_param(debug, uint, 0644);
 // Returns true if an event is processed
 static bool nvmev_proc_dbs(void)
 {
+	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	int qid;
 	int dbs_idx;
 	int new_db;
@@ -161,11 +194,13 @@ static bool nvmev_proc_dbs(void)
 		}
 	}
 
+	// NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return updated;
 }
 
 static int nvmev_dispatcher(void *data)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	static unsigned long last_dispatched_time = 0;
 
 	NVMEV_INFO("nvmev_dispatcher started on cpu %d (node %d)\n",
@@ -185,28 +220,34 @@ static int nvmev_dispatcher(void *data)
 			cond_resched();
 	}
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return 0;
 }
 
 static void NVMEV_DISPATCHER_INIT(struct nvmev_dev *nvmev_vdev)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	nvmev_vdev->nvmev_dispatcher = kthread_create(nvmev_dispatcher, NULL, "nvmev_dispatcher");
 	if (nvmev_vdev->config.cpu_nr_dispatcher != -1)
 		kthread_bind(nvmev_vdev->nvmev_dispatcher, nvmev_vdev->config.cpu_nr_dispatcher);
 	wake_up_process(nvmev_vdev->nvmev_dispatcher);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void NVMEV_DISPATCHER_FINAL(struct nvmev_dev *nvmev_vdev)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	if (!IS_ERR_OR_NULL(nvmev_vdev->nvmev_dispatcher)) {
 		kthread_stop(nvmev_vdev->nvmev_dispatcher);
 		nvmev_vdev->nvmev_dispatcher = NULL;
 	}
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 #ifdef CONFIG_X86
 static int __validate_configs_arch(void)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	unsigned long resv_start_bytes;
 	unsigned long resv_end_bytes;
 
@@ -230,6 +271,7 @@ static int __validate_configs_arch(void)
 #else
 static int __validate_configs_arch(void)
 {
+	// NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	/* TODO: Validate architecture-specific configurations */
 	return 0;
 }
@@ -237,6 +279,7 @@ static int __validate_configs_arch(void)
 
 static int __validate_configs(void)
 {
+	// NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	if (!memmap_start) {
 		NVMEV_ERROR("[memmap_start] should be specified\n");
 		return -EINVAL;
@@ -267,11 +310,13 @@ static int __validate_configs(void)
 		return -EINVAL;
 	}
 
+	// NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return 0;
 }
 
 static void __print_perf_configs(void)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 #ifdef CONFIG_NVMEV_VERBOSE
 	unsigned long unit_perf_kb =
 			nvmev_vdev->config.nr_io_units << (nvmev_vdev->config.io_unit_shift - 10);
@@ -291,19 +336,23 @@ static void __print_perf_configs(void)
 	NVMEV_INFO("  Write    : %lu MiB/s\n",
 			(1000000000UL / (cfg->write_time + cfg->write_delay + cfg->write_trailing)) * unit_perf_kb >> 10);
 #endif
+NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static int __get_nr_entries(int dbs_idx, int queue_size)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	int diff = nvmev_vdev->dbs[dbs_idx] - nvmev_vdev->old_dbs[dbs_idx];
 	if (diff < 0) {
 		diff += queue_size;
 	}
 	return diff;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static int __proc_file_read(struct seq_file *m, void *data)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	const char *filename = m->private;
 	struct nvmev_config *cfg = &nvmev_vdev->config;
 
@@ -345,12 +394,14 @@ static int __proc_file_read(struct seq_file *m, void *data)
 		/* Left for later use */
 	}
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return 0;
 }
 
 static ssize_t __proc_file_write(struct file *file, const char __user *buf, size_t len,
 				 loff_t *offp)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	ssize_t count = len;
 	const char *filename = file->f_path.dentry->d_name.name;
 	char input[128];
@@ -398,12 +449,15 @@ static ssize_t __proc_file_write(struct file *file, const char __user *buf, size
 out:
 	__print_perf_configs();
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return count;
 }
 
 static int __proc_file_open(struct inode *inode, struct file *file)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	return single_open(file, __proc_file_read, (char *)file->f_path.dentry->d_name.name);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 0, 0)
@@ -426,6 +480,7 @@ static const struct file_operations proc_file_fops = {
 
 static void NVMEV_STORAGE_INIT(struct nvmev_dev *nvmev_vdev)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	NVMEV_INFO("Storage: %#010lx-%#010lx (%lu MiB)\n",
 			nvmev_vdev->config.storage_start,
 			nvmev_vdev->config.storage_start + nvmev_vdev->config.storage_size,
@@ -440,7 +495,9 @@ static void NVMEV_STORAGE_INIT(struct nvmev_dev *nvmev_vdev)
 	if (nvmev_vdev->storage_mapped == NULL)
 		NVMEV_ERROR("Failed to map storage memory.\n");
 
+	//在/proc目录下创建nvmev目录 , 在目录下创建文件 read_times,write_times,io_units,stat,debug
 	nvmev_vdev->proc_root = proc_mkdir("nvmev", NULL);
+	//在/proc/nvmev目录下创建文件，文件名为read_times，文件操作函数为proc_file_fops
 	nvmev_vdev->proc_read_times =
 		proc_create("read_times", 0664, nvmev_vdev->proc_root, &proc_file_fops);
 	nvmev_vdev->proc_write_times =
@@ -449,10 +506,14 @@ static void NVMEV_STORAGE_INIT(struct nvmev_dev *nvmev_vdev)
 		proc_create("io_units", 0664, nvmev_vdev->proc_root, &proc_file_fops);
 	nvmev_vdev->proc_stat = proc_create("stat", 0444, nvmev_vdev->proc_root, &proc_file_fops);
 	nvmev_vdev->proc_debug = proc_create("debug", 0444, nvmev_vdev->proc_root, &proc_file_fops);
+
+	NVMEV_INFO("Create proc files in /proc/nvmev/");
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void NVMEV_STORAGE_FINAL(struct nvmev_dev *nvmev_vdev)
 {
+	NVMEV_INFO("[%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	remove_proc_entry("read_times", nvmev_vdev->proc_root);
 	remove_proc_entry("write_times", nvmev_vdev->proc_root);
 	remove_proc_entry("io_units", nvmev_vdev->proc_root);
@@ -466,10 +527,12 @@ static void NVMEV_STORAGE_FINAL(struct nvmev_dev *nvmev_vdev)
 
 	if (nvmev_vdev->io_unit_stat)
 		kfree(nvmev_vdev->io_unit_stat);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static bool __load_configs(struct nvmev_config *config)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	bool first = true;
 	unsigned int cpu_nr;
 	char *cpu;
@@ -485,8 +548,9 @@ static bool __load_configs(struct nvmev_config *config)
 	config->memmap_start = memmap_start;
 	config->memmap_size = memmap_size;
 	// storage space starts from 1M offset
-	config->storage_start = memmap_start + MB(1);
+	config->storage_start = memmap_start + MB(1);// 1048576字节 = 1MB  = 2^20 字节
 	config->storage_size = memmap_size - MB(1);
+	// 预留的这1MB是用于元数据 , BAR DBS MSI-X
 
 	config->read_time = read_time;
 	config->read_delay = read_delay;
@@ -510,30 +574,48 @@ static bool __load_configs(struct nvmev_config *config)
 		}
 		first = false;
 	}
+	NVMEV_INFO("memmap_start %lx\n", config->memmap_start);
+	NVMEV_INFO("memmap_size %lx\n", config->memmap_size);
+	NVMEV_INFO("storage_start %lx\n", config->storage_start);
+	NVMEV_INFO("storage_size %lx\n", config->storage_size);
+	NVMEV_INFO("read_time %u\n", config->read_time);
+	NVMEV_INFO("read_delay %u\n", config->read_delay);
+	NVMEV_INFO("read_trailing %u\n", config->read_trailing);
+	NVMEV_INFO("write_time %u\n", config->write_time);
+	NVMEV_INFO("write_delay %u\n", config->write_delay);
+	NVMEV_INFO("write_trailing %u\n", config->write_trailing);
+	NVMEV_INFO("nr_io_units %u\n", config->nr_io_units);
+	NVMEV_INFO("io_unit_shift %u\n", config->io_unit_shift);
+	NVMEV_INFO("nr_io_workers %u\n", config->nr_io_workers);
+	NVMEV_INFO("cpu_nr_dispatcher %u\n", config->cpu_nr_dispatcher);
+
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 
 	return true;
 }
 
 static void NVMEV_NAMESPACE_INIT(struct nvmev_dev *nvmev_vdev)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	unsigned long long remaining_capacity = nvmev_vdev->config.storage_size;
 	void *ns_addr = nvmev_vdev->storage_mapped;
 	const int nr_ns = NR_NAMESPACES; // XXX: allow for dynamic nr_ns
-	const unsigned int disp_no = nvmev_vdev->config.cpu_nr_dispatcher;
+	const unsigned int disp_no = nvmev_vdev->config.cpu_nr_dispatcher;//调度器cpu编号
 	int i;
 	unsigned long long size;
 
 	struct nvmev_ns *ns = kmalloc(sizeof(struct nvmev_ns) * nr_ns, GFP_KERNEL);
-
+	NVMEV_INFO("nr_ns %d\n",nr_ns);
 	for (i = 0; i < nr_ns; i++) {
 		if (NS_CAPACITY(i) == 0)
 			size = remaining_capacity;
 		else
 			size = min(NS_CAPACITY(i), remaining_capacity);
-
+		NVMEV_INFO("init [%d] namespace,size[%lld], ns_addr[%p], disp_no[%d]\n",i,size, ns_addr, disp_no);
 		if (NS_SSD_TYPE(i) == SSD_TYPE_NVM)
 			simple_init_namespace(&ns[i], i, size, ns_addr, disp_no);
 		else if (NS_SSD_TYPE(i) == SSD_TYPE_CONV)
+			//初始化SSD , 初始化FTL ，
 			conv_init_namespace(&ns[i], i, size, ns_addr, disp_no);
 		else if (NS_SSD_TYPE(i) == SSD_TYPE_ZNS)
 			zns_init_namespace(&ns[i], i, size, ns_addr, disp_no);
@@ -550,10 +632,12 @@ static void NVMEV_NAMESPACE_INIT(struct nvmev_dev *nvmev_vdev)
 	nvmev_vdev->ns = ns;
 	nvmev_vdev->nr_ns = nr_ns;
 	nvmev_vdev->mdts = MDTS;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void NVMEV_NAMESPACE_FINAL(struct nvmev_dev *nvmev_vdev)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_ns *ns = nvmev_vdev->ns;
 	const int nr_ns = NR_NAMESPACES; // XXX: allow for dynamic nvmev_vdev->nr_ns
 	int i;
@@ -573,11 +657,14 @@ static void NVMEV_NAMESPACE_FINAL(struct nvmev_dev *nvmev_vdev)
 
 	kfree(ns);
 	nvmev_vdev->ns = NULL;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void __print_base_config(void)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	const char *type = "unknown";
+	// BASE_SSD 宏是由Kbuild内定义的编译时宏参数
 	switch (BASE_SSD) {
 	case INTEL_OPTANE:
 		type = "NVM SSD";
@@ -598,10 +685,12 @@ static void __print_base_config(void)
 
 	NVMEV_INFO("Version %x.%x for >> %s <<\n",
 			(NVMEV_VERSION & 0xff00) >> 8, (NVMEV_VERSION & 0x00ff), type);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static int NVMeV_init(void)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	int ret = 0;
 
 	__print_base_config();
@@ -610,6 +699,7 @@ static int NVMeV_init(void)
 	if (!nvmev_vdev)
 		return -EINVAL;
 
+	//从启动模块的命令行参数中获取配置信息
 	if (!__load_configs(&nvmev_vdev->config)) {
 		goto ret_err;
 	}
@@ -638,15 +728,18 @@ static int NVMeV_init(void)
 
 	NVMEV_INFO("Virtual NVMe device created\n");
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return 0;
 
 ret_err:
 	VDEV_FINALIZE(nvmev_vdev);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end err\n", __FILE__, __LINE__, __FUNCTION__);
 	return -EIO;
 }
 
 static void NVMeV_exit(void)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	int i;
 
 	if (nvmev_vdev->virt_bus != NULL) {
@@ -675,6 +768,7 @@ static void NVMeV_exit(void)
 	VDEV_FINALIZE(nvmev_vdev);
 
 	NVMEV_INFO("Virtual NVMe device closed\n");
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 MODULE_LICENSE("GPL v2");

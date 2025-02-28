@@ -147,15 +147,15 @@ struct nvmev_admin_queue {
 #define CQ_ENTRY_TO_PAGE_OFFSET(entry_id) (entry_id % NR_CQE_PER_PAGE)
 
 struct nvmev_config {
-	unsigned long memmap_start; // byte
-	unsigned long memmap_size; // byte
+	unsigned long memmap_start; // byte 命令行参数中的开始地址
+	unsigned long memmap_size; // byte 命令行参数中的mapi地址size
 
-	unsigned long storage_start; //byte
-	unsigned long storage_size; // byte
+	unsigned long storage_start; //byte 虚拟设备的开始地址
+	unsigned long storage_size; // byte 虚拟设备的size
 
-	unsigned int cpu_nr_dispatcher;
-	unsigned int nr_io_workers;
-	unsigned int cpu_nr_io_workers[32];
+	unsigned int cpu_nr_dispatcher;// 调度器cpu编号
+	unsigned int nr_io_workers;//IO cpu数量
+	unsigned int cpu_nr_io_workers[32];//IO cpu编号
 
 	/* TODO Refactoring storage configurations */
 	unsigned int nr_io_units;

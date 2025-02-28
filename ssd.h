@@ -145,71 +145,146 @@ blk (block): Nand erase unit
 lun (die) : Nand operation unit
 ch (channel) : Nand <-> SSD controller data transfer unit
 */
+/*
+pg（页面（逻辑层面））：映射单元（4KB）
+flashpg（闪存页面（物理层面））：NAND 感测单元，tR（读取时间）
+oneshotpg（一次性页面）：NAND 编程单元，tPROG（编程时间）（例如：flashpg × 3（TLC））
+blk（块）：NAND 擦除单元
+lun（die芯片）：NAND 操作单元
+ch（通道）：NAND 与 SSD 控制器之间的数据传输单元
+*/
 struct ssdparams {
-	int secsz; /* sector size in bytes */
-	int secs_per_pg; /* # of sectors per page */
-	int pgsz; /* mapping unit size in bytes*/
-	int pgs_per_flashpg; /* # of pgs per flash page */
-	int flashpgs_per_blk; /* # of flash pages per block */
-	int pgs_per_oneshotpg; /* # of pgs per oneshot page */
-	int oneshotpgs_per_blk; /* # of oneshot pages per block */
-	int pgs_per_blk; /* # of pages per block */
-	int blks_per_pl; /* # of blocks per plane */
-	int pls_per_lun; /* # of planes per LUN (Die) */
-	int luns_per_ch; /* # of LUNs per channel */
-	int nchs; /* # of channels in the SSD */
-	int cell_mode;
+    int secsz; /* 扇区大小，以字节为单位 */
+    int secs_per_pg; /* 每个页面的扇区数量 */
+    int pgsz; /* 映射单元大小，以字节为单位 */
+    int pgs_per_flashpg; /* 每个闪存页面的逻辑页面数量 */
+    int flashpgs_per_blk; /* 每个块的闪存页面数量 */
+    int pgs_per_oneshotpg; /* 每个单次写入页面的页面数量 */
+    int oneshotpgs_per_blk; /* 每个块的单次写入页面数量 */
+    int pgs_per_blk; /* 每个block的page数量 */
+    int blks_per_pl; /* 每个plane的block数量 */
+    int pls_per_lun; /* 每个LUN（Die芯片）的plane数量 */
+    int luns_per_ch; /* 每个通道的LUN数量 */
+    int nchs; /* SSD中的通道数量 */
+    int cell_mode; /* 单元模式SLC MLC TLC QLC  */
 
-	/* Unit size of NVMe write command
-       Transfer size should be multiple of it */
-	int write_unit_size;
-	bool write_early_completion;
+    /* NVMe写入命令的单位大小
+       传输大小应为该值的倍数 */
+    int write_unit_size;
+    bool write_early_completion; /* 写入操作是否支持提前完成 */
 
-	int pg_4kb_rd_lat
-		[MAX_CELL_TYPES]; /* NAND page 4KB read latency in nanoseconds. sensing time (half tR) */
-	int pg_rd_lat[MAX_CELL_TYPES]; /* NAND page read latency in nanoseconds. sensing time (tR) */
-	int pg_wr_lat; /* NAND page program latency in nanoseconds. pgm time (tPROG)*/
-	int blk_er_lat; /* NAND block erase latency in nanoseconds. erase time (tERASE) */
-	int max_ch_xfer_size;
+    int pg_4kb_rd_lat
+        [MAX_CELL_TYPES]; /* NAND页面4KB读取延迟，以纳秒为单位。感测时间（半tR） */
+    int pg_rd_lat[MAX_CELL_TYPES]; /* NAND页面读取延迟，以纳秒为单位。感测时间（tR） */
+    int pg_wr_lat; /* NAND页面编程延迟，以纳秒为单位。编程时间（tPROG） */
+    int blk_er_lat; /* NAND块擦除延迟，以纳秒为单位。擦除时间（tERASE） */
+    int max_ch_xfer_size; /* 通道最大传输大小 */
 
-	int fw_4kb_rd_lat; /* Firmware overhead of 4KB read of read in nanoseconds */
-	int fw_rd_lat; /* Firmware overhead of read of read in nanoseconds */
-	int fw_wbuf_lat0; /* Firmware overhead0 of write buffer in nanoseconds */
-	int fw_wbuf_lat1; /* Firmware overhead1 of write buffer in nanoseconds */
-	int fw_ch_xfer_lat; /* Firmware overhead of nand channel data transfer(4KB) in nanoseconds */
+    int fw_4kb_rd_lat; /* 4KB读取的固件开销，以纳秒为单位 */
+    int fw_rd_lat; /* 读取操作的固件开销，以纳秒为单位 */
+    int fw_wbuf_lat0; /* 写入缓冲区的固件开销0，以纳秒为单位 */
+    int fw_wbuf_lat1; /* 写入缓冲区的固件开销1，以纳秒为单位 */
+    int fw_ch_xfer_lat; /* NAND通道数据传输（4KB）的固件开销，以纳秒为单位 */
 
-	uint64_t ch_bandwidth; /*NAND CH Maximum bandwidth in MiB/s*/
-	uint64_t pcie_bandwidth; /*PCIE Maximum bandwidth in MiB/s*/
+    uint64_t ch_bandwidth; /* NAND通道的最大带宽，以MiB/s为单位 */
+    uint64_t pcie_bandwidth; /* PCIe的最大带宽，以MiB/s为单位 */
 
-	/* below are all calculated values */
-	unsigned long secs_per_blk; /* # of sectors per block */
-	unsigned long secs_per_pl; /* # of sectors per plane */
-	unsigned long secs_per_lun; /* # of sectors per LUN */
-	unsigned long secs_per_ch; /* # of sectors per channel */
-	unsigned long tt_secs; /* # of sectors in the SSD */
+    /* 以下是计算得出的值 */
+    unsigned long secs_per_blk; /* 每个块的扇区数量 */
+    unsigned long secs_per_pl; /* 每个平面的扇区数量 */
+    unsigned long secs_per_lun; /* 每个LUN的扇区数量 */
+    unsigned long secs_per_ch; /* 每个通道的扇区数量 */
+    unsigned long tt_secs; /* SSD中的总扇区数量 */
 
-	unsigned long pgs_per_pl; /* # of pages per plane */
-	unsigned long pgs_per_lun; /* # of pages per LUN (Die) */
-	unsigned long pgs_per_ch; /* # of pages per channel */
-	unsigned long tt_pgs; /* total # of pages in the SSD */
+    unsigned long pgs_per_pl; /* 每个平面的页面数量 */
+    unsigned long pgs_per_lun; /* 每个LUN的页面数量 */
+    unsigned long pgs_per_ch; /* 每个通道的页面数量 */
+    unsigned long tt_pgs; /* SSD中的总页面数量 */
 
-	unsigned long blks_per_lun; /* # of blocks per LUN */
-	unsigned long blks_per_ch; /* # of blocks per channel */
-	unsigned long tt_blks; /* total # of blocks in the SSD */
+    unsigned long blks_per_lun; /* 每个LUN的块数量 */
+    unsigned long blks_per_ch; /* 每个通道的块数量 */
+    unsigned long tt_blks; /* SSD中的总块数量 */
 
-	unsigned long secs_per_line;
-	unsigned long pgs_per_line;
-	unsigned long blks_per_line;
-	unsigned long tt_lines;
+    unsigned long secs_per_line;
+    unsigned long pgs_per_line;
+    unsigned long blks_per_line;
+    unsigned long tt_lines;
 
-	unsigned long pls_per_ch; /* # of planes per channel */
-	unsigned long tt_pls; /* total # of planes in the SSD */
+    unsigned long pls_per_ch; /* 每个通道的平面数量 */
+    unsigned long tt_pls; /* SSD中的总平面数量 */
 
-	unsigned long tt_luns; /* total # of LUNs in the SSD */
+    unsigned long tt_luns; /* SSD中的总LUN数量 */
 
-	unsigned long long write_buffer_size;
+    unsigned long long write_buffer_size; /* 写入缓冲区大小 */
 };
 
+// struct ssdparams {
+// 	int secsz; /* sector size in bytes */
+// 	int secs_per_pg; /* # of sectors per page */
+// 	int pgsz; /* mapping unit size in bytes*/
+// 	int pgs_per_flashpg; /* # of pgs per flash page */
+// 	int flashpgs_per_blk; /* # of flash pages per block */
+// 	int pgs_per_oneshotpg; /* # of pgs per oneshot page */
+// 	int oneshotpgs_per_blk; /* # of oneshot pages per block */
+// 	int pgs_per_blk; /* # of pages per block */
+// 	int blks_per_pl; /* # of blocks per plane */
+// 	int pls_per_lun; /* # of planes per LUN (Die) */
+// 	int luns_per_ch; /* # of LUNs per channel */
+// 	int nchs; /* # of channels in the SSD */
+// 	int cell_mode;
+
+// 	/* Unit size of NVMe write command
+//        Transfer size should be multiple of it */
+// 	int write_unit_size;
+// 	bool write_early_completion;
+
+// 	int pg_4kb_rd_lat
+// 		[MAX_CELL_TYPES]; /* NAND page 4KB read latency in nanoseconds. sensing time (half tR) */
+// 	int pg_rd_lat[MAX_CELL_TYPES]; /* NAND page read latency in nanoseconds. sensing time (tR) */
+// 	int pg_wr_lat; /* NAND page program latency in nanoseconds. pgm time (tPROG)*/
+// 	int blk_er_lat; /* NAND block erase latency in nanoseconds. erase time (tERASE) */
+// 	int max_ch_xfer_size;
+
+// 	int fw_4kb_rd_lat; /* Firmware overhead of 4KB read of read in nanoseconds */
+// 	int fw_rd_lat; /* Firmware overhead of read of read in nanoseconds */
+// 	int fw_wbuf_lat0; /* Firmware overhead0 of write buffer in nanoseconds */
+// 	int fw_wbuf_lat1; /* Firmware overhead1 of write buffer in nanoseconds */
+// 	int fw_ch_xfer_lat; /* Firmware overhead of nand channel data transfer(4KB) in nanoseconds */
+
+// 	uint64_t ch_bandwidth; /*NAND CH Maximum bandwidth in MiB/s*/
+// 	uint64_t pcie_bandwidth; /*PCIE Maximum bandwidth in MiB/s*/
+
+// 	/* below are all calculated values */
+// 	unsigned long secs_per_blk; /* # of sectors per block */
+// 	unsigned long secs_per_pl; /* # of sectors per plane */
+// 	unsigned long secs_per_lun; /* # of sectors per LUN */
+// 	unsigned long secs_per_ch; /* # of sectors per channel */
+// 	unsigned long tt_secs; /* # of sectors in the SSD */
+
+// 	unsigned long pgs_per_pl; /* # of pages per plane */
+// 	unsigned long pgs_per_lun; /* # of pages per LUN (Die) */
+// 	unsigned long pgs_per_ch; /* # of pages per channel */
+// 	unsigned long tt_pgs; /* total # of pages in the SSD */
+
+// 	unsigned long blks_per_lun; /* # of blocks per LUN */
+// 	unsigned long blks_per_ch; /* # of blocks per channel */
+// 	unsigned long tt_blks; /* total # of blocks in the SSD */
+
+// 	unsigned long secs_per_line;
+// 	unsigned long pgs_per_line;
+// 	unsigned long blks_per_line;
+// 	unsigned long tt_lines;
+
+// 	unsigned long pls_per_ch; /* # of planes per channel */
+// 	unsigned long tt_pls; /* total # of planes in the SSD */
+
+// 	unsigned long tt_luns; /* total # of LUNs in the SSD */
+
+// 	unsigned long long write_buffer_size;
+// };
+
+
+//SSD实例，本项目中仿真的ssd： SSD主要参数，通道参数，PCIE 参数，写缓冲区
 struct ssd {
 	struct ssdparams sp;
 	struct ssd_channel *ch;

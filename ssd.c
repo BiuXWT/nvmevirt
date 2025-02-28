@@ -67,32 +67,55 @@ static void check_params(struct ssdparams *spp)
 
 void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 {
+	//page->block->plane->Die chip(lun)
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
+	NVMEV_INFO("capacity=%llu,nparts=%u", capacity, nparts);//6441402368,4
 	uint64_t blk_size, total_size;
 
-	spp->secsz = LBA_SIZE;
+	/**
+	 * 页面是物理存储单元，扇区是逻辑存储单元
+	 *		页面是SSD内部的实际存储单元，由闪存芯片的物理结构决定。
+	 *		扇区是逻辑上的存储单元，用于与操作系统和文件系统交互。
+	 */
+	//扇区,在SSD中称为页(page)
+	spp->secsz = LBA_SIZE; // 扇区大小512
 	spp->secs_per_pg = 4096 / LBA_SIZE; // pg == 4KB
-	spp->pgsz = spp->secsz * spp->secs_per_pg;
+	spp->pgsz =
+		spp->secsz *
+		spp->secs_per_pg; //SSD的一个page有8个扇区,每个扇区512 , 写入时,需要将扇区合并为页进行写入
+	NVMEV_INFO("secsz=%d,secs_per_pg=%d,pgsz=%d", //secsz=512,secs_per_pg=8,pgsz=4096
+		   spp->secsz, spp->secs_per_pg, spp->pgsz);
 
-	spp->nchs = NAND_CHANNELS;
-	spp->pls_per_lun = PLNS_PER_LUN;
-	spp->luns_per_ch = LUNS_PER_NAND_CH;
+		   /**
+			* LUN(Logical Unit Number): SSD内部的逻辑单元,通常对应一个闪存芯片(Die chip)
+		    */
+	spp->nchs = NAND_CHANNELS; //8 8个通道
+	spp->pls_per_lun = PLNS_PER_LUN; //2 每个Die chip有2个plane
+	spp->luns_per_ch = LUNS_PER_NAND_CH;//2  一个通道连接2个LUN(Die chip)
 	spp->cell_mode = CELL_MODE;
+	NVMEV_INFO("nchs[%d],pls_per_lun=%d,luns_per_ch=%d,cell_mode=%d", spp->nchs,
+		   spp->pls_per_lun, spp->luns_per_ch, spp->cell_mode);
 
-	/* partitioning SSD by dividing channel*/
+	/* partitioning SSD by dividing channel 通过划分通道（channel）来分区固态硬盘（SSD）*/
 	NVMEV_ASSERT((spp->nchs % nparts) == 0);
 	spp->nchs /= nparts;
 	capacity /= nparts;
+	NVMEV_INFO("after devide: nchs[%d],capacity=%llu\n", spp->nchs,
+		   capacity); //after devide: nchs[2],capacity=1073479680
 
-	if (BLKS_PER_PLN > 0) {
+	if (BLKS_PER_PLN > 0) { //BLKS_PER_PLN 8192
 		/* flashpgs_per_blk depends on capacity */
-		spp->blks_per_pl = BLKS_PER_PLN;
+		spp->blks_per_pl = BLKS_PER_PLN;//8192 ;plane有8192个block
 		blk_size = DIV_ROUND_UP(capacity, spp->blks_per_pl * spp->pls_per_lun *
-							  spp->luns_per_ch * spp->nchs);
+							  spp->luns_per_ch * spp->nchs);//块大小 = 容量/(通道数*每个通道对应的Die数量*plane数量*块数量)
+		NVMEV_INFO("BLKS_PER_PLN[%d],blk_size=%llu", BLKS_PER_PLN,
+			   blk_size); //BLKS_PER_PLN[8192],blk_size=32760/41944
 	} else {
 		NVMEV_ASSERT(BLK_SIZE > 0);
 		blk_size = BLK_SIZE;
 		spp->blks_per_pl = DIV_ROUND_UP(capacity, blk_size * spp->pls_per_lun *
 								  spp->luns_per_ch * spp->nchs);
+		NVMEV_INFO("blk_size=%llu,blks_per_pl=%d", blk_size, spp->blks_per_pl); //
 	}
 
 	NVMEV_ASSERT((ONESHOT_PAGE_SIZE % spp->pgsz) == 0 && (FLASH_PAGE_SIZE % spp->pgsz) == 0);
@@ -100,6 +123,9 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 
 	spp->pgs_per_oneshotpg = ONESHOT_PAGE_SIZE / (spp->pgsz);
 	spp->oneshotpgs_per_blk = DIV_ROUND_UP(blk_size, ONESHOT_PAGE_SIZE);
+	NVMEV_INFO("ONESHOT_PAGE_SIZE[%d],pgs_per_oneshotpg=%d,oneshotpgs_per_blk=%d",
+		   ONESHOT_PAGE_SIZE, spp->pgs_per_oneshotpg, spp->oneshotpgs_per_blk);
+	//ONESHOT_PAGE_SIZE[32768],pgs_per_oneshotpg=8,oneshotpgs_per_blk=1
 
 	spp->pgs_per_flashpg = FLASH_PAGE_SIZE / (spp->pgsz);
 	spp->flashpgs_per_blk = (ONESHOT_PAGE_SIZE / FLASH_PAGE_SIZE) * spp->oneshotpgs_per_blk;
@@ -169,6 +195,13 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 		spp->tt_lines, BYTE_TO_MB(spp->pgs_per_blk * spp->pgsz),
 		BYTE_TO_KB(spp->pgs_per_blk * spp->pgsz), BYTE_TO_MB(spp->pgs_per_line * spp->pgsz),
 		BYTE_TO_KB(spp->pgs_per_line * spp->pgsz));
+	/*总容量：1 GiB（1024 MiB）。
+	通道数：2。
+	逻辑单元数：每个通道有 4 个逻辑单元，总共 8 个逻辑单元。
+	线数量：每个逻辑单元有 8192 条线，总共 65536 条线。
+	块大小：32 KiB。
+	线大小：128 KiB。 */
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void ssd_init_nand_page(struct nand_page *pg, struct ssdparams *spp)
@@ -294,6 +327,7 @@ static void ssd_remove_pcie(struct ssd_pcie *pcie)
 
 void ssd_init(struct ssd *ssd, struct ssdparams *spp, uint32_t cpu_nr_dispatcher)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	uint32_t i;
 	/* copy spp */
 	ssd->sp = *spp;
@@ -313,11 +347,13 @@ void ssd_init(struct ssd *ssd, struct ssdparams *spp, uint32_t cpu_nr_dispatcher
 	ssd->write_buffer = kmalloc(sizeof(struct buffer), GFP_KERNEL);
 	buffer_init(ssd->write_buffer, spp->write_buffer_size);
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return;
 }
 
 void ssd_remove(struct ssd *ssd)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	uint32_t i;
 
 	kfree(ssd->write_buffer);
@@ -331,6 +367,7 @@ void ssd_remove(struct ssd *ssd)
 	}
 
 	kfree(ssd->ch);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 uint64_t ssd_advance_pcie(struct ssd *ssd, uint64_t request_time, uint64_t length)

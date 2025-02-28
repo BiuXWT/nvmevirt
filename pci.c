@@ -15,6 +15,7 @@ static int apicid_to_cpuid[256];
 
 static void __init_apicid_to_cpuid(void)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	int i;
 	for_each_possible_cpu(i) {
 		apicid_to_cpuid[per_cpu(x86_cpu_to_apicid, i)] = i;
@@ -23,6 +24,7 @@ static void __init_apicid_to_cpuid(void)
 
 static void __signal_irq(const char *type, unsigned int irq)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct irq_data *irqd = irq_get_irq_data(irq);
 	struct irq_cfg *irqc = irqd_cfg(irqd);
 
@@ -37,6 +39,7 @@ static void __signal_irq(const char *type, unsigned int irq)
 #else
 static void __signal_irq(const char *type, unsigned int irq)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct irq_data *data = irq_get_irq_data(irq);
 	struct irq_chip *chip = irq_data_get_irq_chip(data);
 
@@ -51,6 +54,7 @@ static void __signal_irq(const char *type, unsigned int irq)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)
 static void __process_msi_irq(int msi_index)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	unsigned int virq = msi_get_virq(&nvmev_vdev->pdev->dev, msi_index);
 
 	BUG_ON(virq == 0);
@@ -59,6 +63,7 @@ static void __process_msi_irq(int msi_index)
 #else
 static void __process_msi_irq(int msi_index)
 {
+	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	struct msi_desc *msi_desc, *tmp;
 
 	for_each_msi_entry_safe(msi_desc, tmp, (&nvmev_vdev->pdev->dev)) {
@@ -74,6 +79,7 @@ static void __process_msi_irq(int msi_index)
 
 void nvmev_signal_irq(int msi_index)
 {
+	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	if (nvmev_vdev->pdev->msix_enabled) {
 		__process_msi_irq(msi_index);
 	} else {
@@ -99,6 +105,7 @@ void nvmev_signal_irq(int msi_index)
  */
 bool nvmev_proc_bars(void)
 {
+	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	volatile struct __nvme_bar *old_bar = nvmev_vdev->old_bar;
 	volatile struct nvme_ctrl_regs *bar = nvmev_vdev->bar;
 	struct nvmev_admin_queue *queue = nvmev_vdev->admin_q;
@@ -264,6 +271,7 @@ out:
 
 static int nvmev_pci_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *val)
 {
+	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	if (devfn != 0)
 		return 1;
 
@@ -276,6 +284,7 @@ static int nvmev_pci_read(struct pci_bus *bus, unsigned int devfn, int where, in
 
 static int nvmev_pci_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 _val)
 {
+	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	u32 mask = ~(0U);
 	u32 val = 0x00;
 	int target = where;
@@ -347,6 +356,7 @@ static struct pci_sysdata nvmev_pci_sysdata = {
 
 static void __dump_pci_dev(struct pci_dev *dev)
 {
+	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	/*
 	NVMEV_DEBUG("bus: %p, subordinate: %p\n", dev->bus, dev->subordinate);
 	NVMEV_DEBUG("vendor: %x, device: %x\n", dev->vendor, dev->device);
@@ -361,6 +371,7 @@ static void __dump_pci_dev(struct pci_dev *dev)
 
 static void __init_nvme_ctrl_regs(struct pci_dev *dev)
 {
+	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	struct nvme_ctrl_regs *bar = memremap(pci_resource_start(dev, 0), PAGE_SIZE * 2, MEMREMAP_WT);
 	BUG_ON(!bar);
 
@@ -383,10 +394,12 @@ static void __init_nvme_ctrl_regs(struct pci_dev *dev)
 			.mnr = 0,
 		},
 	};
+	// NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static struct pci_bus *__create_pci_bus(void)
 {
+	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	struct pci_bus *bus = NULL;
 	struct pci_dev *dev;
 
@@ -426,15 +439,23 @@ static struct pci_bus *__create_pci_bus(void)
 
 	NVMEV_INFO("Virtual PCI bus created (node %d)\n", nvmev_pci_sysdata.node);
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return bus;
 };
 
 struct nvmev_dev *VDEV_INIT(void)
 {
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_dev *nvmev_vdev;
 	nvmev_vdev = kzalloc(sizeof(*nvmev_vdev), GFP_KERNEL);
 
 	nvmev_vdev->virtDev = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	NVMEV_INFO("page_size is %ld\n",PAGE_SIZE);
+	NVMEV_INFO("sizeof pci_header is %lu-[%lx], offs_size=[%u]\n",sizeof(struct pci_header),SZ_PCI_HDR,OFFS_PCI_PM_CAP-OFFS_PCI_HDR);
+	NVMEV_INFO("sizeof pci_pm_cap is %lu-[%lx], offs_size=[%u]\n",sizeof(struct pci_pm_cap),SZ_PCI_PM_CAP,OFFS_PCI_MSIX_CAP-OFFS_PCI_PM_CAP);
+	NVMEV_INFO("sizeof pci_msix_cap is %lu-[%lx], offs_size=[%u]\n",sizeof(struct pci_msix_cap),SZ_PCI_MSIX_CAP,OFFS_PCIE_CAP-OFFS_PCI_MSIX_CAP);
+	NVMEV_INFO("sizeof pcie_cap is %lu-[%lx], offs_size=[%u]\n",sizeof(struct pcie_cap),SZ_PCIE_CAP,OFFS_PCI_EXT_CAP-OFFS_PCIE_CAP);
+	NVMEV_INFO("sizeof pci_ext_cap is %lu-[%lx], offs_size=[%lu]\n",sizeof(struct pci_ext_cap),sizeof(struct pci_ext_cap),PAGE_SIZE-OFFS_PCI_EXT_CAP);
 
 	nvmev_vdev->pcihdr = nvmev_vdev->virtDev + OFFS_PCI_HDR;
 	nvmev_vdev->pmcap = nvmev_vdev->virtDev + OFFS_PCI_PM_CAP;
@@ -444,11 +465,13 @@ struct nvmev_dev *VDEV_INIT(void)
 
 	nvmev_vdev->admin_q = NULL;
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return nvmev_vdev;
 }
 
 void VDEV_FINALIZE(struct nvmev_dev *nvmev_vdev)
 {
+	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	if (nvmev_vdev->msix_table)
 		memunmap(nvmev_vdev->msix_table);
 
@@ -476,10 +499,12 @@ void VDEV_FINALIZE(struct nvmev_dev *nvmev_vdev)
 
 	if (nvmev_vdev)
 		kfree(nvmev_vdev);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void PCI_HEADER_SETTINGS(struct pci_header *pcihdr, unsigned long base_pa)
 {
+	NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	pcihdr->id.did = NVMEV_DEVICE_ID;
 	pcihdr->id.vid = NVMEV_VENDOR_ID;
 	/*
@@ -512,20 +537,24 @@ static void PCI_HEADER_SETTINGS(struct pci_header *pcihdr, unsigned long base_pa
 
 	pcihdr->intr.ipin = 0;
 	pcihdr->intr.iline = NVMEV_INTX_IRQ;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void PCI_PMCAP_SETTINGS(struct pci_pm_cap *pmcap)
 {
+	NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	pmcap->pid.cid = PCI_CAP_ID_PM;
 	pmcap->pid.next = OFFS_PCI_MSIX_CAP;
 
 	pmcap->pc.vs = 3;
 	pmcap->pmcs.nsfrst = 1;
 	pmcap->pmcs.ps = PCI_PM_CAP_PME_D0 >> 16;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void PCI_MSIXCAP_SETTINGS(struct pci_msix_cap *msixcap)
 {
+	NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	msixcap->mxid.cid = PCI_CAP_ID_MSIX;
 	msixcap->mxid.next = OFFS_PCIE_CAP;
 
@@ -537,10 +566,12 @@ static void PCI_MSIXCAP_SETTINGS(struct pci_msix_cap *msixcap)
 
 	msixcap->mpba.pbao = 0x1000;
 	msixcap->mpba.pbir = 0;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void PCI_PCIECAP_SETTINGS(struct pcie_cap *pciecap)
 {
+	NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	pciecap->pxid.cid = PCI_CAP_ID_EXP;
 	pciecap->pxid.next = 0x0;
 
@@ -557,10 +588,12 @@ static void PCI_PCIECAP_SETTINGS(struct pcie_cap *pciecap)
 	pciecap->pxdcap.csplv = 0;
 	pciecap->pxdcap.cspls = 0;
 	pciecap->pxdcap.flrc = 1;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void PCI_EXTCAP_SETTINGS(struct pci_ext_cap *ext_cap)
 {
+	NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	off_t offset = 0;
 	void *ext_cap_base = ext_cap;
 
@@ -610,10 +643,12 @@ static void PCI_EXTCAP_SETTINGS(struct pci_ext_cap *ext_cap)
 	ext_cap->id.cver = 1;
 	ext_cap->id.next = 0;
 	*/
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 bool NVMEV_PCI_INIT(struct nvmev_dev *nvmev_vdev)
 {
+	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
 	PCI_HEADER_SETTINGS(nvmev_vdev->pcihdr, nvmev_vdev->config.memmap_start);
 	PCI_PMCAP_SETTINGS(nvmev_vdev->pmcap);
 	PCI_MSIXCAP_SETTINGS(nvmev_vdev->msixcap);
@@ -626,8 +661,11 @@ bool NVMEV_PCI_INIT(struct nvmev_dev *nvmev_vdev)
 	nvmev_vdev->intx_disabled = false;
 
 	nvmev_vdev->virt_bus = __create_pci_bus();
-	if (!nvmev_vdev->virt_bus)
+	if (!nvmev_vdev->virt_bus){
+		NVMEV_INFO("file: [%s]-[%d]-[%s] end err\n", __FILE__, __LINE__, __FUNCTION__);
 		return false;
+	}
 
+	// NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return true;
 }
