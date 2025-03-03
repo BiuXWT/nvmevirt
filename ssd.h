@@ -50,15 +50,15 @@ enum {
 /* Cell type */
 enum { CELL_TYPE_LSB, CELL_TYPE_MSB, CELL_TYPE_CSB, MAX_CELL_TYPES };
 
-#define TOTAL_PPA_BITS (64)
+#define TOTAL_PPA_BITS (64) //
 #define BLK_BITS (16)
-#define PAGE_BITS (16)
-#define PL_BITS (8)
+#define PAGE_BITS (16) //65535
+#define PL_BITS (8) //256
 #define LUN_BITS (8)
 #define CH_BITS (8)
-#define RSB_BITS (TOTAL_PPA_BITS - (BLK_BITS + PAGE_BITS + PL_BITS + LUN_BITS + CH_BITS))
+#define RSB_BITS (TOTAL_PPA_BITS - (BLK_BITS + PAGE_BITS + PL_BITS + LUN_BITS + CH_BITS)) //8
 
-/* describe a physical page addr */
+/*物理页地址 describe a physical page addr */
 struct ppa {
 	union {
 		struct {
@@ -67,7 +67,7 @@ struct ppa {
 			uint64_t pl : PL_BITS;
 			uint64_t lun : LUN_BITS;
 			uint64_t ch : CH_BITS;
-			uint64_t rsv : RSB_BITS;
+			uint64_t rsv : RSB_BITS;// 保留位
 		} g;
 
 		struct {
@@ -83,37 +83,37 @@ struct ppa {
 typedef int nand_sec_status_t;
 
 struct nand_page {
-	nand_sec_status_t *sec;
-	int nsecs;
+	nand_sec_status_t *sec; // 扇面状态
+	int nsecs; //Sector 数量
 	int status;
 };
 
 struct nand_block {
-	struct nand_page *pg;
-	int npgs;
-	int ipc; /* invalid page count */
-	int vpc; /* valid page count */
+	struct nand_page *pg; //Page
+	int npgs;//Page（页面）数量
+	int ipc; /*失效页数量 invalid page count */
+	int vpc; /*有效页数量 valid page count */
 	int erase_cnt;
 	int wp; /* current write pointer */
 };
 
 struct nand_plane {
-	struct nand_block *blk;
+	struct nand_block *blk; // Block
 	uint64_t next_pln_avail_time;
-	int nblks;
+	int nblks;// Block（块）数量
 };
 
 struct nand_lun {
-	struct nand_plane *pl;
-	int npls;
+	struct nand_plane *pl; //Plane
+	int npls;// Plane（面）数量
 	uint64_t next_lun_avail_time;
 	bool busy;
-	uint64_t gc_endtime;
+	uint64_t gc_endtime;// 垃圾回收结束时间
 };
 
 struct ssd_channel {
-	struct nand_lun *lun;
-	int nluns;
+	struct nand_lun *lun; //Die chip
+	int nluns; //LUN（Die芯片）数量
 	uint64_t gc_endtime;
 	struct channel_model *perf_model;
 };
@@ -156,7 +156,7 @@ ch（通道）：NAND 与 SSD 控制器之间的数据传输单元
 struct ssdparams {
     int secsz; /* 扇区大小，以字节为单位 */
     int secs_per_pg; /* 每个页面的扇区数量 */
-    int pgsz; /* 映射单元大小，以字节为单位 */
+    int pgsz; /*页大小,逻辑页 映射单元大小，以字节为单位 */
     int pgs_per_flashpg; /* 每个闪存页面的逻辑页面数量 */
     int flashpgs_per_blk; /* 每个块的闪存页面数量 */
     int pgs_per_oneshotpg; /* 每个单次写入页面的页面数量 */
@@ -173,8 +173,7 @@ struct ssdparams {
     int write_unit_size;
     bool write_early_completion; /* 写入操作是否支持提前完成 */
 
-    int pg_4kb_rd_lat
-        [MAX_CELL_TYPES]; /* NAND页面4KB读取延迟，以纳秒为单位。感测时间（半tR） */
+    int pg_4kb_rd_lat[MAX_CELL_TYPES]; /* NAND页面4KB读取延迟，以纳秒为单位。感测时间（半tR） */
     int pg_rd_lat[MAX_CELL_TYPES]; /* NAND页面读取延迟，以纳秒为单位。感测时间（tR） */
     int pg_wr_lat; /* NAND页面编程延迟，以纳秒为单位。编程时间（tPROG） */
     int blk_er_lat; /* NAND块擦除延迟，以纳秒为单位。擦除时间（tERASE） */
@@ -286,9 +285,9 @@ struct ssdparams {
 
 //SSD实例，本项目中仿真的ssd： SSD主要参数，通道参数，PCIE 参数，写缓冲区
 struct ssd {
-	struct ssdparams sp;
-	struct ssd_channel *ch;
-	struct ssd_pcie *pcie;
+	struct ssdparams sp;//SSD参数
+	struct ssd_channel *ch;// 通道数组
+	struct ssd_pcie *pcie;//  PCIe 实例
 	struct buffer *write_buffer;
 	unsigned int cpu_nr_dispatcher;
 };

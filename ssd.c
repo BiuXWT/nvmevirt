@@ -69,7 +69,7 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 {
 	//page->block->plane->Die chip(lun)
 	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
-	NVMEV_INFO("capacity=%llu,nparts=%u", capacity, nparts);//6441402368,4
+	NVMEV_INFO("capacity=%llu,nparts=%u", capacity, nparts);//8GB-1MB,4
 	uint64_t blk_size, total_size;
 
 	/**
@@ -82,34 +82,35 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 	spp->secs_per_pg = 4096 / LBA_SIZE; // pg == 4KB
 	spp->pgsz =
 		spp->secsz *
-		spp->secs_per_pg; //SSD的一个page有8个扇区,每个扇区512 , 写入时,需要将扇区合并为页进行写入
+		spp->secs_per_pg; //SSD的一个逻辑页(page)大小4K有8个扇区,每个扇区512字节 , 写入时,需要将扇区合并为页进行写入
 	NVMEV_INFO("secsz=%d,secs_per_pg=%d,pgsz=%d", //secsz=512,secs_per_pg=8,pgsz=4096
 		   spp->secsz, spp->secs_per_pg, spp->pgsz);
 
-		   /**
-			* LUN(Logical Unit Number): SSD内部的逻辑单元,通常对应一个闪存芯片(Die chip)
-		    */
+	/**
+	* LUN(Logical Unit Number): SSD内部的逻辑单元,通常对应一个闪存芯片(Die chip)
+	*/
 	spp->nchs = NAND_CHANNELS; //8 8个通道
-	spp->pls_per_lun = PLNS_PER_LUN; //2 每个Die chip有2个plane
+	spp->pls_per_lun = PLNS_PER_LUN; //1 每个Die chip有1个plane
 	spp->luns_per_ch = LUNS_PER_NAND_CH;//2  一个通道连接2个LUN(Die chip)
 	spp->cell_mode = CELL_MODE;
-	NVMEV_INFO("nchs[%d],pls_per_lun=%d,luns_per_ch=%d,cell_mode=%d", spp->nchs,
+	NVMEV_INFO("nchs[%d],pls_per_lun[%d],luns_per_ch[%d],cell_mode[%d]", spp->nchs,
 		   spp->pls_per_lun, spp->luns_per_ch, spp->cell_mode);
+		   //   nchs[8],pls_per_lun=1,luns_per_ch=2,cell_mode=2
 
 	/* partitioning SSD by dividing channel 通过划分通道（channel）来分区固态硬盘（SSD）*/
 	NVMEV_ASSERT((spp->nchs % nparts) == 0);
-	spp->nchs /= nparts;
+	spp->nchs /= nparts;// 2通道
 	capacity /= nparts;
-	NVMEV_INFO("after devide: nchs[%d],capacity=%llu\n", spp->nchs,
-		   capacity); //after devide: nchs[2],capacity=1073479680
+	NVMEV_INFO("after devide: nchs[%d],capacity[%llu]\n", spp->nchs, capacity); 
+			//after devide: nchs[2],capacity[2147221504]
 
 	if (BLKS_PER_PLN > 0) { //BLKS_PER_PLN 8192
 		/* flashpgs_per_blk depends on capacity */
 		spp->blks_per_pl = BLKS_PER_PLN;//8192 ;plane有8192个block
 		blk_size = DIV_ROUND_UP(capacity, spp->blks_per_pl * spp->pls_per_lun *
-							  spp->luns_per_ch * spp->nchs);//块大小 = 容量/(通道数*每个通道对应的Die数量*plane数量*块数量)
+							  spp->luns_per_ch * spp->nchs);//块大小 = 容量/(通道数2*每个通道对应的Die数量2*plane数量1*块数量8192)
 		NVMEV_INFO("BLKS_PER_PLN[%d],blk_size=%llu", BLKS_PER_PLN,
-			   blk_size); //BLKS_PER_PLN[8192],blk_size=32760/41944
+			   blk_size); //BLKS_PER_PLN[8192],blk_size=65528
 	} else {
 		NVMEV_ASSERT(BLK_SIZE > 0);
 		blk_size = BLK_SIZE;
@@ -121,16 +122,19 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 	NVMEV_ASSERT((ONESHOT_PAGE_SIZE % spp->pgsz) == 0 && (FLASH_PAGE_SIZE % spp->pgsz) == 0);
 	NVMEV_ASSERT((ONESHOT_PAGE_SIZE % FLASH_PAGE_SIZE) == 0);
 
-	spp->pgs_per_oneshotpg = ONESHOT_PAGE_SIZE / (spp->pgsz);
+	spp->pgs_per_oneshotpg = ONESHOT_PAGE_SIZE / (spp->pgsz);// 每次写入 8 页
 	spp->oneshotpgs_per_blk = DIV_ROUND_UP(blk_size, ONESHOT_PAGE_SIZE);
 	NVMEV_INFO("ONESHOT_PAGE_SIZE[%d],pgs_per_oneshotpg=%d,oneshotpgs_per_blk=%d",
 		   ONESHOT_PAGE_SIZE, spp->pgs_per_oneshotpg, spp->oneshotpgs_per_blk);
-	//ONESHOT_PAGE_SIZE[32768],pgs_per_oneshotpg=8,oneshotpgs_per_blk=1
+	//ONESHOT_PAGE_SIZE[32768,32K],pgs_per_oneshotpg=8,oneshotpgs_per_blk=2
 
-	spp->pgs_per_flashpg = FLASH_PAGE_SIZE / (spp->pgsz);
+	/* 通常闪存页大于逻辑页, 实际场景中若干个逻辑页写在一个物理页: 逻辑页实际和子物理页一一对应 */
+	spp->pgs_per_flashpg = FLASH_PAGE_SIZE / (spp->pgsz); // 闪存页大小(32KB)÷逻辑页大小(4KB)=8
 	spp->flashpgs_per_blk = (ONESHOT_PAGE_SIZE / FLASH_PAGE_SIZE) * spp->oneshotpgs_per_blk;
-
-	spp->pgs_per_blk = spp->pgs_per_oneshotpg * spp->oneshotpgs_per_blk;
+	spp->pgs_per_blk = spp->pgs_per_oneshotpg * spp->oneshotpgs_per_blk;// 8
+	NVMEV_INFO("FLASH_PAGE_SIZE[%d],pgs_per_flashpg[%d],flashpgs_per_blk[%d],pgs_per_blk[%d]\n",
+				FLASH_PAGE_SIZE, spp->pgs_per_flashpg, spp->flashpgs_per_blk, spp->pgs_per_blk);
+				//FLASH_PAGE_SIZE[32768],pgs_per_flashpg[8],flashpgs_per_blk[2],pgs_per_blk[16]
 
 	spp->write_unit_size = WRITE_UNIT_SIZE;
 
@@ -142,7 +146,7 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 	spp->pg_rd_lat[CELL_TYPE_CSB] = NAND_READ_LATENCY_CSB;
 	spp->pg_wr_lat = NAND_PROG_LATENCY;
 	spp->blk_er_lat = NAND_ERASE_LATENCY;
-	spp->max_ch_xfer_size = MAX_CH_XFER_SIZE;
+	spp->max_ch_xfer_size = MAX_CH_XFER_SIZE;//通道最大传输大小16KB
 
 	spp->fw_4kb_rd_lat = FW_4KB_READ_LATENCY;
 	spp->fw_rd_lat = FW_READ_LATENCY;
@@ -157,31 +161,46 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 	spp->write_early_completion = WRITE_EARLY_COMPLETION;
 
 	/* calculated values */
-	spp->secs_per_blk = spp->secs_per_pg * spp->pgs_per_blk;
-	spp->secs_per_pl = spp->secs_per_blk * spp->blks_per_pl;
-	spp->secs_per_lun = spp->secs_per_pl * spp->pls_per_lun;
-	spp->secs_per_ch = spp->secs_per_lun * spp->luns_per_ch;
-	spp->tt_secs = spp->secs_per_ch * spp->nchs;
+	spp->secs_per_blk = spp->secs_per_pg * spp->pgs_per_blk;//8*16=128
+	spp->secs_per_pl = spp->secs_per_blk * spp->blks_per_pl;//128*8192=1048576
+	spp->secs_per_lun = spp->secs_per_pl * spp->pls_per_lun;//1048576
+	spp->secs_per_ch = spp->secs_per_lun * spp->luns_per_ch;//1048576*2=2097152
+	spp->tt_secs = spp->secs_per_ch * spp->nchs;//2097152*2=4194304
+	NVMEV_INFO("secs_per_blk=%lu,secs_per_pl=%lu,secs_per_lun=%lu,secs_per_ch=%lu,tt_secs=%lu",
+		   spp->secs_per_blk, spp->secs_per_pl, spp->secs_per_lun, spp->secs_per_ch, spp->tt_secs);
+			//secs_per_blk=128,secs_per_pl=1048576,secs_per_lun=1048576,secs_per_ch=2097152,tt_secs=4194304
 
-	spp->pgs_per_pl = spp->pgs_per_blk * spp->blks_per_pl;
-	spp->pgs_per_lun = spp->pgs_per_pl * spp->pls_per_lun;
-	spp->pgs_per_ch = spp->pgs_per_lun * spp->luns_per_ch;
-	spp->tt_pgs = spp->pgs_per_ch * spp->nchs;
+	spp->pgs_per_pl = spp->pgs_per_blk * spp->blks_per_pl;//16*8192=131072
+	spp->pgs_per_lun = spp->pgs_per_pl * spp->pls_per_lun;//131072*1
+	spp->pgs_per_ch = spp->pgs_per_lun * spp->luns_per_ch;//131072*2=262144
+	spp->tt_pgs = spp->pgs_per_ch * spp->nchs;//262144*2=524288
+	NVMEV_INFO("pgs_per_pl=%lu,pgs_per_lun=%lu,pgs_per_ch=%lu,tt_pgs=%lu", spp->pgs_per_pl,
+		   spp->pgs_per_lun, spp->pgs_per_ch, spp->tt_pgs);
+			//pgs_per_pl=131072,pgs_per_lun=131072,pgs_per_ch=262144,tt_pgs=524288
 
-	spp->blks_per_lun = spp->blks_per_pl * spp->pls_per_lun;
-	spp->blks_per_ch = spp->blks_per_lun * spp->luns_per_ch;
-	spp->tt_blks = spp->blks_per_ch * spp->nchs;
+	spp->blks_per_lun = spp->blks_per_pl * spp->pls_per_lun;//8192*1
+	spp->blks_per_ch = spp->blks_per_lun * spp->luns_per_ch;//8192*2=16384
+	spp->tt_blks = spp->blks_per_ch * spp->nchs;//16384*2=32768
+	NVMEV_INFO("blks_per_lun=%lu,blks_per_ch=%lu,tt_blks=%lu", spp->blks_per_lun,
+		   spp->blks_per_ch, spp->tt_blks);
+			//blks_per_lun=8192,blks_per_ch=16384,tt_blks=32768
 
 	spp->pls_per_ch = spp->pls_per_lun * spp->luns_per_ch;
 	spp->tt_pls = spp->pls_per_ch * spp->nchs;
+	NVMEV_INFO("pls_per_ch=%lu,tt_pls=%lu", spp->pls_per_ch, spp->tt_pls);
+			  //pls_per_ch=2,tt_pls=4
 
 	spp->tt_luns = spp->luns_per_ch * spp->nchs;
-
+	NVMEV_INFO("tt_luns=%lu", spp->tt_luns);
+	
 	/* line is special, put it at the end */
 	spp->blks_per_line = spp->tt_luns; /* TODO: to fix under multiplanes */
 	spp->pgs_per_line = spp->blks_per_line * spp->pgs_per_blk;
 	spp->secs_per_line = spp->pgs_per_line * spp->secs_per_pg;
 	spp->tt_lines = spp->blks_per_lun;
+	NVMEV_INFO("blks_per_line=%lu,pgs_per_line=%lu,secs_per_line=%lu,tt_lines=%lu",
+		   spp->blks_per_line, spp->pgs_per_line, spp->secs_per_line, spp->tt_lines);
+		   //blks_per_line=4,pgs_per_line=64,secs_per_line=512,tt_lines=8192
 	/* TODO: to fix under multiplanes */ // lun size is super-block(line) size
 
 	check_params(spp);
@@ -191,16 +210,41 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 	blk_size = spp->pgs_per_blk * spp->secsz * spp->secs_per_pg;
 	NVMEV_INFO(
 		"Total Capacity(GiB,MiB)=%llu,%llu chs=%u luns=%lu lines=%lu blk-size(MiB,KiB)=%u,%u line-size(MiB,KiB)=%lu,%lu",
-		BYTE_TO_GB(total_size), BYTE_TO_MB(total_size), spp->nchs, spp->tt_luns,
-		spp->tt_lines, BYTE_TO_MB(spp->pgs_per_blk * spp->pgsz),
-		BYTE_TO_KB(spp->pgs_per_blk * spp->pgsz), BYTE_TO_MB(spp->pgs_per_line * spp->pgsz),
-		BYTE_TO_KB(spp->pgs_per_line * spp->pgsz));
-	/*总容量：1 GiB（1024 MiB）。
-	通道数：2。
-	逻辑单元数：每个通道有 4 个逻辑单元，总共 8 个逻辑单元。
-	线数量：每个逻辑单元有 8192 条线，总共 65536 条线。
-	块大小：32 KiB。
-	线大小：128 KiB。 */
+		BYTE_TO_GB(total_size), BYTE_TO_MB(total_size), 
+		spp->nchs, 
+		spp->tt_luns,
+		spp->tt_lines, 
+		BYTE_TO_MB(spp->pgs_per_blk * spp->pgsz), BYTE_TO_KB(spp->pgs_per_blk * spp->pgsz),
+		BYTE_TO_MB(spp->pgs_per_line * spp->pgsz), BYTE_TO_KB(spp->pgs_per_line * spp->pgsz));
+	/*
+		pgs_per_pl=131072,pgs_per_lun=131072,pgs_per_ch=262144,tt_pgs=524288
+		blks_per_lun=8192,blks_per_ch=16384,tt_blks=32768
+		pls_per_ch=2,tt_pls=4
+		tt_luns=4
+		blks_per_line=4,pgs_per_line=64,secs_per_line=512,tt_lines=8192
+		Total Capacity(GiB,MiB)=2,2048 chs=2 luns=4 lines=8192 blk-size(MiB,KiB)=0,64 line-size(MiB,KiB)=0,256
+	*/
+	/*
+	1 sector = 512 bit
+	8 sectors=1 page;
+	8 (logical)pages = 1 flash page;
+	2 flash page = 1block; 16 pages = 1 block;
+	8192 blocks = 1 plane
+	1 plane = 1 Die Chip
+	4 Die Chips = 1 SSD
+
+
+	1 channels has 2 Die chip(lun)
+
+	nParts: 4
+	Channels: 8 
+	Die Chips: 4
+	planes: 4
+	blocks: 32768
+	flash pages: 
+	pages: 524288
+	sectors: 4194304
+	*/
 	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 

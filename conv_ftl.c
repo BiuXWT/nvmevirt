@@ -396,11 +396,11 @@ static void conv_remove_ftl(struct conv_ftl *conv_ftl)
 static void conv_init_params(struct convparams *cpp)
 {
 	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
-	cpp->op_area_pcent = OP_AREA_PERCENT;
+	cpp->op_area_pcent = OP_AREA_PERCENT;// samsung 0.07
 	cpp->gc_thres_lines = 2; /* Need only two lines.(host write, gc)*/
 	cpp->gc_thres_lines_high = 2; /* Need only two lines.(host write, gc)*/
 	cpp->enable_gc_delay = 1;
-	cpp->pba_pcent = (int)((1 + cpp->op_area_pcent) * 100);
+	cpp->pba_pcent = (int)((1 + cpp->op_area_pcent) * 100);// 107
 }
 
 void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *mapped_addr,
@@ -415,7 +415,7 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 	const uint32_t nr_parts = SSD_PARTITIONS;
 	NVMEV_INFO("Initialize %d partitions; size[%lld]\n", nr_parts,size);
 
-	//设置参数
+	//设置SSD参数
 	ssd_init_params(&spp, size, nr_parts);
 	conv_init_params(&cpp);
 
