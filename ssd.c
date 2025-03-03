@@ -181,8 +181,8 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 	spp->blks_per_lun = spp->blks_per_pl * spp->pls_per_lun;//8192*1
 	spp->blks_per_ch = spp->blks_per_lun * spp->luns_per_ch;//8192*2=16384
 	spp->tt_blks = spp->blks_per_ch * spp->nchs;//16384*2=32768
-	NVMEV_INFO("blks_per_lun=%lu,blks_per_ch=%lu,tt_blks=%lu", spp->blks_per_lun,
-		   spp->blks_per_ch, spp->tt_blks);
+	NVMEV_INFO("blks_per_lun=%lu,blks_per_ch=%lu,tt_blks=%lu", 
+			spp->blks_per_lun, spp->blks_per_ch, spp->tt_blks);
 			//blks_per_lun=8192,blks_per_ch=16384,tt_blks=32768
 
 	spp->pls_per_ch = spp->pls_per_lun * spp->luns_per_ch;
@@ -191,7 +191,7 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 			  //pls_per_ch=2,tt_pls=4
 
 	spp->tt_luns = spp->luns_per_ch * spp->nchs;
-	NVMEV_INFO("tt_luns=%lu", spp->tt_luns);
+	NVMEV_INFO("tt_luns=%lu", spp->tt_luns);//4
 	
 	/* line is special, put it at the end */
 	spp->blks_per_line = spp->tt_luns; /* TODO: to fix under multiplanes */
@@ -206,8 +206,10 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 	check_params(spp);
 
 	total_size = (unsigned long)spp->tt_luns * spp->blks_per_lun * spp->pgs_per_blk *
-		     spp->secsz * spp->secs_per_pg;
-	blk_size = spp->pgs_per_blk * spp->secsz * spp->secs_per_pg;
+		     spp->secsz * spp->secs_per_pg;//4*8192*16*4*512*8=2147483648
+	blk_size = spp->pgs_per_blk * spp->secsz * spp->secs_per_pg;//16*512*8=65536
+	NVMEV_INFO("total_size[%lu],blk_size[%lu]",total_size, blk_size);
+			//total_size[2147483648],blk_size[65536]
 	NVMEV_INFO(
 		"Total Capacity(GiB,MiB)=%llu,%llu chs=%u luns=%lu lines=%lu blk-size(MiB,KiB)=%u,%u line-size(MiB,KiB)=%lu,%lu",
 		BYTE_TO_GB(total_size), BYTE_TO_MB(total_size), 
@@ -217,11 +219,6 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 		BYTE_TO_MB(spp->pgs_per_blk * spp->pgsz), BYTE_TO_KB(spp->pgs_per_blk * spp->pgsz),
 		BYTE_TO_MB(spp->pgs_per_line * spp->pgsz), BYTE_TO_KB(spp->pgs_per_line * spp->pgsz));
 	/*
-		pgs_per_pl=131072,pgs_per_lun=131072,pgs_per_ch=262144,tt_pgs=524288
-		blks_per_lun=8192,blks_per_ch=16384,tt_blks=32768
-		pls_per_ch=2,tt_pls=4
-		tt_luns=4
-		blks_per_line=4,pgs_per_line=64,secs_per_line=512,tt_lines=8192
 		Total Capacity(GiB,MiB)=2,2048 chs=2 luns=4 lines=8192 blk-size(MiB,KiB)=0,64 line-size(MiB,KiB)=0,256
 	*/
 	/*
