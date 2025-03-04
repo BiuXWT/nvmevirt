@@ -708,6 +708,8 @@ static int NVMeV_init(void)
 
 	NVMEV_NAMESPACE_INIT(nvmev_vdev);
 
+	NVMEV_INFO("#### storage and namespace initialization complete ####\n");
+
 	if (io_using_dma) {
 		if (ioat_dma_chan_set("dma7chan0") != 0) {
 			io_using_dma = false;
@@ -726,7 +728,7 @@ static int NVMeV_init(void)
 
 	pci_bus_add_devices(nvmev_vdev->virt_bus);
 
-	NVMEV_INFO("Virtual NVMe device created\n");
+	NVMEV_INFO("#### Virtual NVMe device created#### \n");
 
 	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return 0;

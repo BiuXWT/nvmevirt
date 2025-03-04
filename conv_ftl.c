@@ -106,6 +106,7 @@ static inline void consume_write_credit(struct conv_ftl *conv_ftl)
 {
 	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	conv_ftl->wfc.write_credits--;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void foreground_gc(struct conv_ftl *conv_ftl);
@@ -119,6 +120,7 @@ static inline void check_and_refill_write_credit(struct conv_ftl *conv_ftl)
 
 		wfc->write_credits += wfc->credits_to_refill;
 	}
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void init_lines(struct conv_ftl *conv_ftl)
@@ -129,7 +131,7 @@ static void init_lines(struct conv_ftl *conv_ftl)
 	struct line *line;
 	int i;
 
-	lm->tt_lines = spp->blks_per_pl;
+	lm->tt_lines = spp->blks_per_pl;//总行数=plane的block数 , 8192
 	NVMEV_ASSERT(lm->tt_lines == spp->tt_lines);
 	lm->lines = vmalloc(sizeof(struct line) * lm->tt_lines);
 
@@ -158,6 +160,7 @@ static void init_lines(struct conv_ftl *conv_ftl)
 	NVMEV_ASSERT(lm->free_line_cnt == lm->tt_lines);
 	lm->victim_line_cnt = 0;
 	lm->full_line_cnt = 0;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void remove_lines(struct conv_ftl *conv_ftl)
@@ -165,6 +168,7 @@ static void remove_lines(struct conv_ftl *conv_ftl)
 	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	pqueue_free(conv_ftl->lm.victim_line_pq);
 	vfree(conv_ftl->lm.lines);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void init_write_flow_control(struct conv_ftl *conv_ftl)
@@ -173,14 +177,16 @@ static void init_write_flow_control(struct conv_ftl *conv_ftl)
 	struct write_flow_control *wfc = &(conv_ftl->wfc);
 	struct ssdparams *spp = &conv_ftl->ssd->sp;
 
-	wfc->write_credits = spp->pgs_per_line;
-	wfc->credits_to_refill = spp->pgs_per_line;
+	wfc->write_credits = spp->pgs_per_line;//64 1个line有4个block,1个block有16个page
+	wfc->credits_to_refill = spp->pgs_per_line;//64
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static inline void check_addr(int a, int max)
 {
 	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	NVMEV_ASSERT(a >= 0 && a < max);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static struct line *get_next_free_line(struct conv_ftl *conv_ftl)
@@ -197,6 +203,7 @@ static struct line *get_next_free_line(struct conv_ftl *conv_ftl)
 	list_del_init(&curline->entry);
 	lm->free_line_cnt--;
 	NVMEV_DEBUG("%s: free_line_cnt %d\n", __func__, lm->free_line_cnt);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return curline;
 }
 
@@ -210,6 +217,7 @@ static struct write_pointer *__get_wp(struct conv_ftl *ftl, uint32_t io_type)
 	}
 
 	NVMEV_ASSERT(0);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return NULL;
 }
 
@@ -231,6 +239,7 @@ static void prepare_write_pointer(struct conv_ftl *conv_ftl, uint32_t io_type)
 		.blk = curline->id,
 		.pl = 0,
 	};
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void advance_write_pointer(struct conv_ftl *conv_ftl, uint32_t io_type)
@@ -300,6 +309,7 @@ static void advance_write_pointer(struct conv_ftl *conv_ftl, uint32_t io_type)
 out:
 	NVMEV_DEBUG_VERBOSE("advanced wpp: ch:%d, lun:%d, pl:%d, blk:%d, pg:%d (curline %d)\n",
 			wpp->ch, wpp->lun, wpp->pl, wpp->blk, wpp->pg, wpp->curline->id);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static struct ppa get_new_page(struct conv_ftl *conv_ftl, uint32_t io_type)
@@ -317,6 +327,7 @@ static struct ppa get_new_page(struct conv_ftl *conv_ftl, uint32_t io_type)
 
 	NVMEV_ASSERT(ppa.g.pl == 0);
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return ppa;
 }
 
@@ -326,16 +337,18 @@ static void init_maptbl(struct conv_ftl *conv_ftl)
 	int i;
 	struct ssdparams *spp = &conv_ftl->ssd->sp;
 
-	conv_ftl->maptbl = vmalloc(sizeof(struct ppa) * spp->tt_pgs);
+	conv_ftl->maptbl = vmalloc(sizeof(struct ppa) * spp->tt_pgs);//一个分区有 524288个页
 	for (i = 0; i < spp->tt_pgs; i++) {
-		conv_ftl->maptbl[i].ppa = UNMAPPED_PPA;
+		conv_ftl->maptbl[i].ppa = UNMAPPED_PPA;// 物理地址初始化为ffff,ffff,ffff,ffff
 	}
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void remove_maptbl(struct conv_ftl *conv_ftl)
 {
 	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	vfree(conv_ftl->maptbl);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void init_rmap(struct conv_ftl *conv_ftl)
@@ -346,14 +359,16 @@ static void init_rmap(struct conv_ftl *conv_ftl)
 
 	conv_ftl->rmap = vmalloc(sizeof(uint64_t) * spp->tt_pgs);
 	for (i = 0; i < spp->tt_pgs; i++) {
-		conv_ftl->rmap[i] = INVALID_LPN;
+		conv_ftl->rmap[i] = INVALID_LPN;// 初始化为ffff,ffff,ffff,ffff
 	}
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void remove_rmap(struct conv_ftl *conv_ftl)
 {
 	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	vfree(conv_ftl->rmap);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void conv_init_ftl(struct conv_ftl *conv_ftl, struct convparams *cpp, struct ssd *ssd)
@@ -365,10 +380,10 @@ static void conv_init_ftl(struct conv_ftl *conv_ftl, struct convparams *cpp, str
 	conv_ftl->ssd = ssd;
 
 	/* initialize maptbl */
-	init_maptbl(conv_ftl); // mapping table
+	init_maptbl(conv_ftl); // mapping table 按页映射ppa(物理页地址)physical page address
 
 	/* initialize rmap */
-	init_rmap(conv_ftl); // reverse mapping table (?)
+	init_rmap(conv_ftl); // reverse mapping table 反向映射表,存放物理地址对应的逻辑页号LPN(Logical page number)
 
 	/* initialize all the lines */
 	init_lines(conv_ftl);
@@ -382,6 +397,7 @@ static void conv_init_ftl(struct conv_ftl *conv_ftl, struct convparams *cpp, str
 	NVMEV_INFO("Init FTL instance with %d channels (%ld pages)\n", conv_ftl->ssd->sp.nchs,
 		   conv_ftl->ssd->sp.tt_pgs);
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return;
 }
 
@@ -391,6 +407,7 @@ static void conv_remove_ftl(struct conv_ftl *conv_ftl)
 	remove_lines(conv_ftl);
 	remove_rmap(conv_ftl);
 	remove_maptbl(conv_ftl);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 //设置垃圾回收参数
 static void conv_init_params(struct convparams *cpp)
@@ -401,6 +418,7 @@ static void conv_init_params(struct convparams *cpp)
 	cpp->gc_thres_lines_high = 2; /* Need only two lines.(host write, gc)*/
 	cpp->enable_gc_delay = 1;
 	cpp->pba_pcent = (int)((1 + cpp->op_area_pcent) * 100);// 107
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *mapped_addr,
@@ -412,7 +430,7 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 	struct conv_ftl *conv_ftls;
 	struct ssd *ssd;
 	uint32_t i;
-	const uint32_t nr_parts = SSD_PARTITIONS;
+	const uint32_t nr_parts = SSD_PARTITIONS; //分成4份
 	NVMEV_INFO("Initialize %d partitions; size[%lld]\n", nr_parts,size);
 
 	//设置SSD参数
@@ -421,11 +439,11 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 
 	conv_ftls = kmalloc(sizeof(struct conv_ftl) * nr_parts, GFP_KERNEL);
 
-	//用上面的参数初始化ssd和ftl
+	//用上面的参数初始化4个ssd和ftl实例 , 增加并行???
 	for (i = 0; i < nr_parts; i++) {
 		ssd = kmalloc(sizeof(struct ssd), GFP_KERNEL);
-		ssd_init(ssd, &spp, cpu_nr_dispatcher);
-		conv_init_ftl(&conv_ftls[i], &cpp, ssd);
+		ssd_init(ssd, &spp, cpu_nr_dispatcher);// 初始化了4个ssd实例,每个2GB
+		conv_init_ftl(&conv_ftls[i], &cpp, ssd);// conv_ftls[i]是4个conv_ftl实例, 总共管理8GB空间
 	}
 
 	/* PCIe, Write buffer are shared by all instances*/
@@ -443,7 +461,7 @@ void conv_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *
 	ns->csi = NVME_CSI_NVM;
 	ns->nr_parts = nr_parts;
 	ns->ftls = (void *)conv_ftls;
-	ns->size = (uint64_t)((size * 100) / cpp.pba_pcent);
+	ns->size = (uint64_t)((size * 100) / cpp.pba_pcent);// namespace size = 8GB/1.07
 	ns->mapped = mapped_addr;
 	/*register io command handler*/
 	ns->proc_io_cmd = conv_proc_nvme_io_cmd;
@@ -504,6 +522,7 @@ static inline bool valid_ppa(struct conv_ftl *conv_ftl, struct ppa *ppa)
 	if (pg < 0 || pg >= spp->pgs_per_blk)
 		return false;
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return true;
 }
 
@@ -511,18 +530,21 @@ static inline bool valid_lpn(struct conv_ftl *conv_ftl, uint64_t lpn)
 {
 	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	return (lpn < conv_ftl->ssd->sp.tt_pgs);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static inline bool mapped_ppa(struct ppa *ppa)
 {
 	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	return !(ppa->ppa == UNMAPPED_PPA);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static inline struct line *get_line(struct conv_ftl *conv_ftl, struct ppa *ppa)
 {
 	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	return &(conv_ftl->lm.lines[ppa->g.blk]);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 /* update SSD status about one page from PG_VALID -> PG_VALID */
@@ -572,6 +594,7 @@ static void mark_page_invalid(struct conv_ftl *conv_ftl, struct ppa *ppa)
 		pqueue_insert(lm->victim_line_pq, line);
 		lm->victim_line_cnt++;
 	}
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void mark_page_valid(struct conv_ftl *conv_ftl, struct ppa *ppa)
@@ -596,6 +619,7 @@ static void mark_page_valid(struct conv_ftl *conv_ftl, struct ppa *ppa)
 	line = get_line(conv_ftl, ppa);
 	NVMEV_ASSERT(line->vpc >= 0 && line->vpc < spp->pgs_per_line);
 	line->vpc++;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void mark_block_free(struct conv_ftl *conv_ftl, struct ppa *ppa)
@@ -618,6 +642,7 @@ static void mark_block_free(struct conv_ftl *conv_ftl, struct ppa *ppa)
 	blk->ipc = 0;
 	blk->vpc = 0;
 	blk->erase_cnt++;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void gc_read_page(struct conv_ftl *conv_ftl, struct ppa *ppa)
@@ -637,6 +662,7 @@ static void gc_read_page(struct conv_ftl *conv_ftl, struct ppa *ppa)
 		};
 		ssd_advance_nand(conv_ftl->ssd, &gcr);
 	}
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 /* move valid page data (already in DRAM) from victim line to a new page */
@@ -685,6 +711,7 @@ static uint64_t gc_write_page(struct conv_ftl *conv_ftl, struct ppa *old_ppa)
 	new_lun->gc_endtime = new_lun->next_lun_avail_time;
 #endif
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return 0;
 }
 
@@ -709,6 +736,7 @@ static struct line *select_victim_line(struct conv_ftl *conv_ftl, bool force)
 	lm->victim_line_cnt--;
 
 	/* victim_line is a danggling node now */
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return victim_line;
 }
 
@@ -735,6 +763,7 @@ static void clean_one_block(struct conv_ftl *conv_ftl, struct ppa *ppa)
 	}
 
 	NVMEV_ASSERT(get_blk(conv_ftl->ssd, ppa)->vpc == cnt);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 /* here ppa identifies the block we want to clean */
@@ -786,6 +815,7 @@ static void clean_one_flashpg(struct conv_ftl *conv_ftl, struct ppa *ppa)
 
 		ppa_copy.g.pg++;
 	}
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static void mark_line_free(struct conv_ftl *conv_ftl, struct ppa *ppa)
@@ -798,6 +828,7 @@ static void mark_line_free(struct conv_ftl *conv_ftl, struct ppa *ppa)
 	/* move this line to free line list */
 	list_add_tail(&line->entry, &lm->free_line_list);
 	lm->free_line_cnt++;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static int do_gc(struct conv_ftl *conv_ftl, bool force)
@@ -860,6 +891,7 @@ static int do_gc(struct conv_ftl *conv_ftl, bool force)
 	/* update line status */
 	mark_line_free(conv_ftl, &ppa);
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return 0;
 }
 
@@ -871,6 +903,7 @@ static void foreground_gc(struct conv_ftl *conv_ftl)
 		/* perform GC here until !should_gc(conv_ftl) */
 		do_gc(conv_ftl, true);
 	}
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static bool is_same_flash_page(struct conv_ftl *conv_ftl, struct ppa ppa1, struct ppa ppa2)
@@ -881,6 +914,7 @@ static bool is_same_flash_page(struct conv_ftl *conv_ftl, struct ppa ppa1, struc
 	uint32_t ppa2_page = ppa2.g.pg / spp->pgs_per_flashpg;
 
 	return (ppa1.h.blk_in_ssd == ppa2.h.blk_in_ssd) && (ppa1_page == ppa2_page);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static bool conv_read(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_result *ret)
@@ -973,6 +1007,7 @@ static bool conv_read(struct nvmev_ns *ns, struct nvmev_request *req, struct nvm
 
 	ret->nsecs_target = nsecs_latest;
 	ret->status = NVME_SC_SUCCESS;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return true;
 }
 
@@ -1076,6 +1111,7 @@ static bool conv_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nv
 	}
 	ret->status = NVME_SC_SUCCESS;
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return true;
 }
 
@@ -1096,6 +1132,7 @@ static void conv_flush(struct nvmev_ns *ns, struct nvmev_request *req, struct nv
 
 	ret->status = NVME_SC_SUCCESS;
 	ret->nsecs_target = latest;
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return;
 }
 
@@ -1124,5 +1161,6 @@ bool conv_proc_nvme_io_cmd(struct nvmev_ns *ns, struct nvmev_request *req, struc
 		break;
 	}
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 	return true;
 }

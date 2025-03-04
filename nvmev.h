@@ -242,16 +242,16 @@ struct nvmev_dev {
 	u32 *old_dbs;
 	u32 __iomem *dbs;
 
-	struct nvmev_ns *ns;
-	unsigned int nr_ns;
-	unsigned int nr_sq;
-	unsigned int nr_cq;
+	struct nvmev_ns *ns;// NVME namespace
+	unsigned int nr_ns; // namespace number
+	unsigned int nr_sq; // submission queue number
+	unsigned int nr_cq; // completion queue number
 
 	struct nvmev_admin_queue *admin_q;
 	struct nvmev_submission_queue *sqes[NR_MAX_IO_QUEUE + 1];
 	struct nvmev_completion_queue *cqes[NR_MAX_IO_QUEUE + 1];
 
-	unsigned int mdts;
+	unsigned int mdts;//Maximum Data Transfer Size
 
 	struct proc_dir_entry *proc_root;
 	struct proc_dir_entry *proc_read_times;

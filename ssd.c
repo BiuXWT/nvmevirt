@@ -159,6 +159,8 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 
 	spp->write_buffer_size = GLOBAL_WB_SIZE;
 	spp->write_early_completion = WRITE_EARLY_COMPLETION;
+	NVMEV_INFO("ch_bandwidth=%llu,pcie_bandwidth=%llu,write_buffer_size=%llu",
+			   spp->ch_bandwidth, spp->pcie_bandwidth, spp->write_buffer_size);
 
 	/* calculated values */
 	spp->secs_per_blk = spp->secs_per_pg * spp->pgs_per_blk;//8*16=128
@@ -190,12 +192,12 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 	NVMEV_INFO("pls_per_ch=%lu,tt_pls=%lu", spp->pls_per_ch, spp->tt_pls);
 			  //pls_per_ch=2,tt_pls=4
 
-	spp->tt_luns = spp->luns_per_ch * spp->nchs;
+	spp->tt_luns = spp->luns_per_ch * spp->nchs;//2*2
 	NVMEV_INFO("tt_luns=%lu", spp->tt_luns);//4
 	
 	/* line is special, put it at the end */
 	spp->blks_per_line = spp->tt_luns; /* TODO: to fix under multiplanes */
-	spp->pgs_per_line = spp->blks_per_line * spp->pgs_per_blk;
+	spp->pgs_per_line = spp->blks_per_line * spp->pgs_per_blk;//4*16=64
 	spp->secs_per_line = spp->pgs_per_line * spp->secs_per_pg;
 	spp->tt_lines = spp->blks_per_lun;
 	NVMEV_INFO("blks_per_line=%lu,pgs_per_line=%lu,secs_per_line=%lu,tt_lines=%lu",
@@ -208,7 +210,7 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 	total_size = (unsigned long)spp->tt_luns * spp->blks_per_lun * spp->pgs_per_blk *
 		     spp->secsz * spp->secs_per_pg;//4*8192*16*4*512*8=2147483648
 	blk_size = spp->pgs_per_blk * spp->secsz * spp->secs_per_pg;//16*512*8=65536
-	NVMEV_INFO("total_size[%lu],blk_size[%lu]",total_size, blk_size);
+	NVMEV_INFO("total_size[%llu],blk_size[%llu]",total_size, blk_size);
 			//total_size[2147483648],blk_size[65536]
 	NVMEV_INFO(
 		"Total Capacity(GiB,MiB)=%llu,%llu chs=%u luns=%lu lines=%lu blk-size(MiB,KiB)=%u,%u line-size(MiB,KiB)=%lu,%lu",
@@ -248,12 +250,12 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 static void ssd_init_nand_page(struct nand_page *pg, struct ssdparams *spp)
 {
 	int i;
-	pg->nsecs = spp->secs_per_pg;
+	pg->nsecs = spp->secs_per_pg;//8
 	pg->sec = kmalloc(sizeof(nand_sec_status_t) * pg->nsecs, GFP_KERNEL);
 	for (i = 0; i < pg->nsecs; i++) {
-		pg->sec[i] = SEC_FREE;
+		pg->sec[i] = SEC_FREE;//扇面空
 	}
-	pg->status = PG_FREE;
+	pg->status = PG_FREE;//页面空
 }
 
 static void ssd_remove_nand_page(struct nand_page *pg)
@@ -264,7 +266,7 @@ static void ssd_remove_nand_page(struct nand_page *pg)
 static void ssd_init_nand_blk(struct nand_block *blk, struct ssdparams *spp)
 {
 	int i;
-	blk->npgs = spp->pgs_per_blk;
+	blk->npgs = spp->pgs_per_blk;//16
 	blk->pg = kmalloc(sizeof(struct nand_page) * blk->npgs, GFP_KERNEL);
 	for (i = 0; i < blk->npgs; i++) {
 		ssd_init_nand_page(&blk->pg[i], spp);
@@ -288,7 +290,7 @@ static void ssd_remove_nand_blk(struct nand_block *blk)
 static void ssd_init_nand_plane(struct nand_plane *pl, struct ssdparams *spp)
 {
 	int i;
-	pl->nblks = spp->blks_per_pl;
+	pl->nblks = spp->blks_per_pl;//8192
 	pl->blk = kmalloc(sizeof(struct nand_block) * pl->nblks, GFP_KERNEL);
 	for (i = 0; i < pl->nblks; i++) {
 		ssd_init_nand_blk(&pl->blk[i], spp);
@@ -308,7 +310,7 @@ static void ssd_remove_nand_plane(struct nand_plane *pl)
 static void ssd_init_nand_lun(struct nand_lun *lun, struct ssdparams *spp)
 {
 	int i;
-	lun->npls = spp->pls_per_lun;
+	lun->npls = spp->pls_per_lun;//1
 	lun->pl = kmalloc(sizeof(struct nand_plane) * lun->npls, GFP_KERNEL);
 	for (i = 0; i < lun->npls; i++) {
 		ssd_init_nand_plane(&lun->pl[i], spp);
@@ -330,14 +332,15 @@ static void ssd_remove_nand_lun(struct nand_lun *lun)
 static void ssd_init_ch(struct ssd_channel *ch, struct ssdparams *spp)
 {
 	int i;
-	ch->nluns = spp->luns_per_ch;
+	ch->nluns = spp->luns_per_ch;//2
 	ch->lun = kmalloc(sizeof(struct nand_lun) * ch->nluns, GFP_KERNEL);
 	for (i = 0; i < ch->nluns; i++) {
 		ssd_init_nand_lun(&ch->lun[i], spp);
 	}
 
 	ch->perf_model = kmalloc(sizeof(struct channel_model), GFP_KERNEL);
-	chmodel_init(ch->perf_model, spp->ch_bandwidth);
+	NVMEV_INFO("init ssd ch perf model");
+	chmodel_init(ch->perf_model, spp->ch_bandwidth);//通道模型实例化
 
 	/* Add firmware overhead */
 	ch->perf_model->xfer_lat += (spp->fw_ch_xfer_lat * UNIT_XFER_SIZE / KB(4));
@@ -358,6 +361,7 @@ static void ssd_remove_ch(struct ssd_channel *ch)
 static void ssd_init_pcie(struct ssd_pcie *pcie, struct ssdparams *spp)
 {
 	pcie->perf_model = kmalloc(sizeof(struct channel_model), GFP_KERNEL);
+	NVMEV_INFO("init pcie ch perf model");
 	chmodel_init(pcie->perf_model, spp->pcie_bandwidth);
 }
 

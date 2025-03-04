@@ -286,7 +286,7 @@ struct ssdparams {
 //SSD实例，本项目中仿真的ssd： SSD主要参数，通道参数，PCIE 参数，写缓冲区
 struct ssd {
 	struct ssdparams sp;//SSD参数
-	struct ssd_channel *ch;// 通道数组
+	struct ssd_channel *ch;// SSD 的逻辑结构 ch->lun->pl->blk->pg->sec
 	struct ssd_pcie *pcie;//  PCIe 实例
 	struct buffer *write_buffer;
 	unsigned int cpu_nr_dispatcher;

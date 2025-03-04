@@ -716,7 +716,7 @@ static int nvmev_io_worker(void *data)
 
 void NVMEV_IO_WORKER_INIT(struct nvmev_dev *nvmev_vdev)
 {
-//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	unsigned int i, worker_id;
 
 	nvmev_vdev->io_workers =
@@ -747,11 +747,12 @@ void NVMEV_IO_WORKER_INIT(struct nvmev_dev *nvmev_vdev)
 		kthread_bind(worker->task_struct, nvmev_vdev->config.cpu_nr_io_workers[worker_id]);
 		wake_up_process(worker->task_struct);
 	}
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 void NVMEV_IO_WORKER_FINAL(struct nvmev_dev *nvmev_vdev)
 {
-//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	unsigned int i;
 
 	for (i = 0; i < nvmev_vdev->config.nr_io_workers; i++) {
@@ -765,4 +766,5 @@ void NVMEV_IO_WORKER_FINAL(struct nvmev_dev *nvmev_vdev)
 	}
 
 	kfree(nvmev_vdev->io_workers);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] end\n", __FILE__, __LINE__, __FUNCTION__);
 }
