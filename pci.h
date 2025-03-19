@@ -3,21 +3,37 @@
 #ifndef _LIB_NVMEV_HDR_H
 #define _LIB_NVMEV_HDR_H
 
+//Base Address Register
 struct __nvme_bar {
-	uint64_t cap; /* Controller Capabilities */
-	uint32_t vs; /* Version */
-	uint32_t intms; /* Interrupt Mask Set */
-	uint32_t intmc; /* Interrupt Mask Clear */
-	uint32_t cc; /* Controller Configuration */
-	uint32_t rsvd1; /* Reserved */
-	uint32_t csts; /* Controller Status */
-	uint32_t nssr; /* Subsystem Reset */
-	uint32_t aqa; /* Admin Queue Attributes */
-	uint64_t asq; /* Admin SQ Base Address */
-	uint64_t acq; /* Admin CQ Base Address */
-	uint32_t cmbloc; /* Controller Memory Buffer Location */
-	uint32_t cmbsz; /* Controller Memory Buffer Size */
+	uint64_t cap; /* 控制器功能 */
+	uint32_t vs; /* 版本 */
+	uint32_t intms; /* 中断屏蔽设置 */
+	uint32_t intmc; /* 中断屏蔽清除 */
+	uint32_t cc; /* 控制器配置 */
+	uint32_t rsvd1; /* 保留 */
+	uint32_t csts; /* 控制器状态 */
+	uint32_t nssr; /* 子系统复位 */
+	uint32_t aqa; /* 管理队列属性 */
+	uint64_t asq; /* 管理发送队列基地址 */
+	uint64_t acq; /* 管理完成队列基地址 */
+	uint32_t cmbloc; /* 控制器内存缓冲区位置 */
+	uint32_t cmbsz; /* 控制器内存缓冲区大小 */
 };
+// struct __nvme_bar {
+// 	uint64_t cap; /* Controller Capabilities */
+// 	uint32_t vs; /* Version */
+// 	uint32_t intms; /* Interrupt Mask Set */
+// 	uint32_t intmc; /* Interrupt Mask Clear */
+// 	uint32_t cc; /* Controller Configuration */
+// 	uint32_t rsvd1; /* Reserved */
+// 	uint32_t csts; /* Controller Status */
+// 	uint32_t nssr; /* Subsystem Reset */
+// 	uint32_t aqa; /* Admin Queue Attributes */
+// 	uint64_t asq; /* Admin SQ Base Address */
+// 	uint64_t acq; /* Admin CQ Base Address */
+// 	uint32_t cmbloc; /* Controller Memory Buffer Location */
+// 	uint32_t cmbsz; /* Controller Memory Buffer Size */
+// };
 
 struct pci_header {
 	struct {

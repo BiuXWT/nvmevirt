@@ -13,6 +13,18 @@
 	(page_address(pfn_to_page(prp >> PAGE_SHIFT) + offset) + (prp & ~PAGE_MASK))
 #define prp_address(prp) prp_address_offset(prp, 0)
 
+char nvme_cmd_hex_str[256];
+char* nvme_command_to_hex_string(const struct nvme_command *cmd) {
+    const uint8_t *ptr = (const uint8_t *)cmd;
+    size_t size = sizeof(struct nvme_command);
+    size_t i;
+
+    for (i = 0; i < size; i++) {
+        sprintf(nvme_cmd_hex_str + i * 2, "%02x", ptr[i]);
+    }
+    nvme_cmd_hex_str[size * 2] = '\0'; // 添加字符串结束符
+	return nvme_cmd_hex_str;
+}
 static void __make_cq_entry_results(int eid, u16 ret, u32 result0, u32 result1)
 {
 	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
@@ -582,11 +594,11 @@ static void __nvmev_admin_async_event(int eid)
 
 static void __nvmev_proc_admin_req(int entry_id)
 {
-	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
+	// NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_admin_queue *queue = nvmev_vdev->admin_q;
 	struct nvme_command *sqe = &sq_entry(entry_id);
 
-	NVMEV_DEBUG("%s: %d 0x%x 0x%x\n", __func__, entry_id,
+	NVMEV_INFO("%s: %d 0x%x 0x%x\n", __func__, entry_id,
 			sqe->common.opcode, sqe->common.command_id);
 
 	switch (sqe->common.opcode) {
@@ -633,7 +645,7 @@ static void __nvmev_proc_admin_req(int entry_id)
 
 void nvmev_proc_admin_sq(int new_db, int old_db)
 {
-	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
+	// NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_admin_queue *queue = nvmev_vdev->admin_q;
 	int num_proc = new_db - old_db;
 	int curr = old_db;

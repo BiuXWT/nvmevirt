@@ -103,6 +103,16 @@ void nvmev_signal_irq(int msi_index)
  *
  * Returns true if an event is processed.
  */
+/*
+• 主机设备驱动程序可以在BAR的多个位置进行更改。
+• 在实际设备中，这些更改是依次处理的，保留了它们的请求顺序。
+• 然而，在NVMeVirt中，这些更改可以通过调度器被检测到，这使得在检查循环之间进行的更改之间的顺序变得模糊不清。
+• 因此，我们必须有策略地处理这些更改，按照它们本应被处理的顺序……
+• 
+• 此外，这里不需要内存屏障，因为与BAR相关的操作仅由调度器处理。
+• 
+• 如果处理了一个事件，则返回true。
+*/
 bool nvmev_proc_bars(void)
 {
 	// NVMEV_INFO("file: [%s]-[%s] start\n", __FILE__, __FUNCTION__);
@@ -144,7 +154,7 @@ bool nvmev_proc_bars(void)
 #endif
 	if (old_bar->aqa != bar->u_aqa) {
 		// Initalize admin queue
-		NVMEV_DEBUG("%s: aqa 0x%x -> 0x%x\n", __func__, old_bar->aqa, bar->u_aqa);
+		NVMEV_INFO("%s: aqa 0x%x -> 0x%x\n", __func__, old_bar->aqa, bar->u_aqa);
 		old_bar->aqa = bar->u_aqa;
 
 		if (!queue) {
@@ -179,7 +189,7 @@ bool nvmev_proc_bars(void)
 			goto out;
 		}
 
-		NVMEV_DEBUG("%s: asq 0x%llx -> 0x%llx\n", __func__, old_bar->asq, bar->u_asq);
+		NVMEV_INFO("%s: asq 0x%llx -> 0x%llx\n", __func__, old_bar->asq, bar->u_asq);
 		old_bar->asq = bar->u_asq;
 
 		if (queue->nvme_sq) {
@@ -188,6 +198,7 @@ bool nvmev_proc_bars(void)
 		}
 
 		queue->sq_depth = bar->aqa.asqs + 1; /* asqs and acqs are 0-based */
+		NVMEV_INFO("sq depth:%d",queue->sq_depth);
 
 		num_pages = DIV_ROUND_UP(queue->sq_depth * sizeof(struct nvme_command), PAGE_SIZE);
 		queue->nvme_sq = kcalloc(num_pages, sizeof(struct nvme_command *), GFP_KERNEL);
@@ -209,7 +220,7 @@ bool nvmev_proc_bars(void)
 			goto out;
 		}
 
-		NVMEV_DEBUG("%s: acq 0x%llx -> 0x%llx\n", __func__, old_bar->acq, bar->u_acq);
+		NVMEV_INFO("%s: acq 0x%llx -> 0x%llx\n", __func__, old_bar->acq, bar->u_acq);
 		old_bar->acq = bar->u_acq;
 
 		if (queue->nvme_cq) {
@@ -218,6 +229,7 @@ bool nvmev_proc_bars(void)
 		}
 
 		queue->cq_depth = bar->aqa.acqs + 1; /* asqs and acqs are 0-based */
+		NVMEV_INFO("cq depth:%d",queue->cq_depth);
 
 		num_pages =
 			DIV_ROUND_UP(queue->cq_depth * sizeof(struct nvme_completion), PAGE_SIZE);
@@ -235,7 +247,7 @@ bool nvmev_proc_bars(void)
 		goto out;
 	}
 	if (old_bar->cc != bar->u_cc) {
-		NVMEV_DEBUG("%s: cc 0x%x:%x -> 0x%x:%x\n", __func__, old_bar->cc, old_bar->csts, bar->u_cc,
+		NVMEV_INFO("%s: cc 0x%x:%x -> 0x%x:%x\n", __func__, old_bar->cc, old_bar->csts, bar->u_cc,
 			    bar->u_csts);
 		/* Enable */
 		if (bar->cc.en == 1) {
@@ -262,10 +274,13 @@ bool nvmev_proc_bars(void)
 		goto out;
 	}
 
+	// NVMEV_INFO("file: [%s]-[%s] end false\n", __FILE__, __FUNCTION__);
 	return false;
 
 out:
 	smp_mb();
+	/*确保在此之前的所有内存操作都已经完成，然后再返回函数结果。这有助于避免由于内存操作重排序导致的竞争条件或其他并发问题。*/
+	NVMEV_INFO("file: [%s]-[%s] end true\n", __FILE__, __FUNCTION__);
 	return true;
 }
 

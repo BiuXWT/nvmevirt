@@ -26,6 +26,13 @@
  *
  * The default is set to 60 seconds, which is extremely conservative and
  * should not have an impact on I/O testing.
+ * 
+   	如果定义了 CONFIG_NVMEVIRT_IDLE_TIMEOUT ，则在设备处于空闲状态达到
+	CONFIG_NVMEVIRT_IDLE_TIMEOUT 秒后，系统会休眠一个时钟周期（jiffie），以降低CPU的功耗。
+
+	这可能会在退出I/O空闲状态时引入大约 (1000 / CONFIG_HZ) 毫秒的处理延迟。
+
+	默认值设置为60秒，这个设定非常保守，通常不会对I/O测试产生影响。
  */
 #define CONFIG_NVMEVIRT_IDLE_TIMEOUT 60
 

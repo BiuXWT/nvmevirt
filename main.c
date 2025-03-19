@@ -208,9 +208,9 @@ static int nvmev_dispatcher(void *data)
 		   cpu_to_node(nvmev_vdev->config.cpu_nr_dispatcher));
 
 	while (!kthread_should_stop()) {
-		if (nvmev_proc_bars())
+		if (nvmev_proc_bars())//处理bar
 			last_dispatched_time = jiffies;
-		if (nvmev_proc_dbs())
+		if (nvmev_proc_dbs()) //处理doorbell，即命令
 			last_dispatched_time = jiffies;
 
 		if (CONFIG_NVMEVIRT_IDLE_TIMEOUT != 0 &&
@@ -723,9 +723,12 @@ static int NVMeV_init(void)
 
 	__print_perf_configs();
 
+	NVMEV_INFO("hardware initialization complete ####\n");
+
 	NVMEV_IO_WORKER_INIT(nvmev_vdev);
 	NVMEV_DISPATCHER_INIT(nvmev_vdev);
 
+	NVMEV_INFO("pci add dev ...");
 	pci_bus_add_devices(nvmev_vdev->virt_bus);
 
 	NVMEV_INFO("#### Virtual NVMe device created#### \n");

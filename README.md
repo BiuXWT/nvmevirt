@@ -447,3 +447,36 @@ pci_pm_cap "1" *-- "1" pc
 pci_pm_cap "1" *-- "1" pmcs
 @enduml
 ```
+
+
+nvmev_dispatcher
+```mermaid
+flowchart TD
+A[开始] -->E{判断内核现成是否该结束}
+E --> |否| B[nvmev_proc_bars]
+B --> C[nvmev_proc_dbs]
+E --> |是| D[结束]
+```
+
+nvmev_proc_bars
+```mermaid
+flowchart TD
+    A[开始] --> B{aqa变化?}
+    B -->|是| C[初始化管理队列]
+    B -->|否| D{asq变化?}
+    D -->|是| E[更新提交队列]
+    D -->|否| F{acq变化?}
+    F -->|是| G[更新完成队列]
+    F -->|否| H{cc变化?}
+    H -->|是| I[处理控制器配置]
+    I --> J{使能?}
+    J -->|是| K[设置就绪状态]
+    J -->|否| L[清除就绪状态]
+    H -->|否| M[结束]
+    C --> N[结束]
+    E --> N
+    G --> N
+    K --> N
+    L --> N
+```
+nvmev_io_worker

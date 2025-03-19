@@ -573,7 +573,7 @@ static void __fill_cq_result(struct nvmev_io_work *w)
 
 static int nvmev_io_worker(void *data)
 {
-//	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	struct nvmev_io_worker *worker = (struct nvmev_io_worker *)data;
 	struct nvmev_ns *ns;
 	static unsigned long last_io_time = 0;
@@ -711,6 +711,7 @@ static int nvmev_io_worker(void *data)
 			cond_resched();
 	}
 
+	NVMEV_INFO("file: [%s]-[%d]-[%s] start\n", __FILE__, __LINE__, __FUNCTION__);
 	return 0;
 }
 
