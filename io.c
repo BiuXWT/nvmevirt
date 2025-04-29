@@ -62,6 +62,7 @@ static unsigned int __do_perform_io(int sqid, int sq_entry)
 	u64 paddr;
 	u64 *paddr_list = NULL;
 	size_t nsid = cmd->nsid - 1; // 0-based
+	bool is_paddr_memremap = false;
 
 	offset = __cmd_io_offset(cmd);
 	length = __cmd_io_size(cmd);
@@ -71,6 +72,7 @@ static unsigned int __do_perform_io(int sqid, int sq_entry)
 		size_t io_size;
 		void *vaddr;
 		size_t mem_offs = 0;
+		bool is_vaddr_memremap = false;
 
 		prp_offs++;
 		if (prp_offs == 1) {
@@ -78,15 +80,26 @@ static unsigned int __do_perform_io(int sqid, int sq_entry)
 		} else if (prp_offs == 2) {
 			paddr = cmd->prp2;
 			if (remaining > PAGE_SIZE) {
-				paddr_list = kmap_atomic_pfn(PRP_PFN(paddr)) +
-					     (paddr & PAGE_OFFSET_MASK);
+				if (pfn_valid(paddr >> PAGE_SHIFT)) {
+					paddr_list = kmap_atomic_pfn(PRP_PFN(paddr)) +
+						(paddr & PAGE_OFFSET_MASK);
+				} else {
+					paddr_list = memremap(paddr, PAGE_SIZE, MEMREMAP_WT);
+					paddr_list += (paddr & PAGE_OFFSET_MASK);
+					is_paddr_memremap = true;
+				}
 				paddr = paddr_list[prp2_offs++];
 			}
 		} else {
 			paddr = paddr_list[prp2_offs++];
 		}
 
-		vaddr = kmap_atomic_pfn(PRP_PFN(paddr));
+		if (pfn_valid(paddr >> PAGE_SHIFT)) {
+			vaddr = kmap_atomic_pfn(PRP_PFN(paddr));
+		} else {
+			vaddr = memremap(paddr, PAGE_SIZE, MEMREMAP_WT);
+			is_vaddr_memremap = true;
+		}
 
 		io_size = min_t(size_t, remaining, PAGE_SIZE);
 
@@ -103,14 +116,26 @@ static unsigned int __do_perform_io(int sqid, int sq_entry)
 			memcpy(vaddr + mem_offs, nvmev_vdev->ns[nsid].mapped + offset, io_size);
 		}
 
-		kunmap_atomic(vaddr);
+		if (vaddr != NULL && !is_vaddr_memremap) {
+			kunmap_atomic(vaddr);
+			vaddr = NULL;
+		} else if (vaddr != NULL && is_vaddr_memremap) {
+			memunmap(vaddr);
+			vaddr = NULL;
+			is_vaddr_memremap = false;
+		}
 
 		remaining -= io_size;
 		offset += io_size;
 	}
 
-	if (paddr_list != NULL)
-		kunmap_atomic(paddr_list);
+	if (paddr_list) {
+		if (!is_paddr_memremap) 
+			kunmap_atomic(paddr_list);
+		else if (is_paddr_memremap) 
+			memunmap(paddr_list);
+	}
+	paddr_list = NULL;
 
 	return length;
 }
@@ -132,6 +157,7 @@ static unsigned int __do_perform_io_using_dma(int sqid, int sq_entry)
 	u64 *tmp_paddr_list = NULL;
 	size_t io_size;
 	size_t mem_offs = 0;
+	bool is_memremap = false;
 
 	offset = __cmd_io_offset(cmd);
 	length = __cmd_io_size(cmd);
@@ -148,8 +174,14 @@ static unsigned int __do_perform_io_using_dma(int sqid, int sq_entry)
 		} else if (prp_offs == 2) {
 			paddr_list[prp_offs] = cmd->prp2;
 			if (remaining > PAGE_SIZE) {
-				tmp_paddr_list = kmap_atomic_pfn(PRP_PFN(paddr_list[prp_offs])) +
-						 (paddr_list[prp_offs] & PAGE_OFFSET_MASK);
+				if (pfn_valid(paddr_list[prp_offs] >> PAGE_SHIFT)) {
+ 					tmp_paddr_list = kmap_atomic_pfn(PRP_PFN(paddr_list[prp_offs])) + 
+							(paddr_list[prp_offs] & PAGE_OFFSET_MASK);
+ 				} else {
+ 					tmp_paddr_list = memremap(paddr_list[prp_offs], PAGE_SIZE, MEMREMAP_WT);
+ 					tmp_paddr_list += (paddr_list[prp_offs] & PAGE_OFFSET_MASK);
+ 					is_memremap = true;
+ 				}
 				paddr_list[prp_offs] = tmp_paddr_list[prp2_offs++];
 			}
 		} else {
@@ -168,8 +200,12 @@ static unsigned int __do_perform_io_using_dma(int sqid, int sq_entry)
 	}
 	num_prps = prp_offs;
 
-	if (tmp_paddr_list != NULL)
-		kunmap_atomic(tmp_paddr_list);
+	if (tmp_paddr_list != NULL && !is_memremap) {
+ 		kunmap_atomic(tmp_paddr_list);
+ 	} else if (tmp_paddr_list != NULL && is_memremap) {
+ 		memunmap(tmp_paddr_list);
+ 		is_memremap = false;
+ 	}
 
 	remaining = length;
 	prp_offs = 1;
@@ -550,10 +586,13 @@ static void __fill_cq_result(struct nvmev_io_work *w)
 	unsigned int result1 = w->result1;
 
 	struct nvmev_completion_queue *cq = nvmev_vdev->cqes[cqid];
-	int cq_head = cq->cq_head;
-	struct nvme_completion *cqe = &cq_entry(cq_head);
+	struct nvme_completion *cqe;
+	int cq_head;
 
 	spin_lock(&cq->entry_lock);
+	cq_head = cq->cq_head;
+	cqe = &cq_entry(cq_head);
+
 	cqe->command_id = command_id;
 	cqe->sq_id = sqid;
 	cqe->sq_head = sq_entry;
